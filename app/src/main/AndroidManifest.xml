@@ -141,6 +141,12 @@
             android:exported="false"
             android:theme="@style/Theme.AgristockCapstoneProject" />
 
+        <!-- Bid Post Activity -->
+        <activity
+            android:name=".BidPostActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AgristockCapstoneProject" />
+
         <!-- Home Activity (if you want to keep it separate) -->
         <!-- Removed HomeActivity reference if not implemented -->
 
