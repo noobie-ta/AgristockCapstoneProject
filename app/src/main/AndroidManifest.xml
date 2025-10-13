@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- For reading gallery images on Android 13+ -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <!-- For reading gallery images pre-Android 13 -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+
+    <application
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.AgristockCapstoneProject"
+        tools:targetApi="31">
+
+        <!-- Splash Activity (Launch Activity) -->
+        <activity
+            android:name=".SplashActivity"
+            android:exported="true"
+            android:theme="@style/Theme.AgristockCapstoneProject">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Main Activity (After successful login) -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AgristockCapstoneProject" />
+
+        
+
+        <!-- Login Activity -->
+        <activity
+            android:name=".login.LoginActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AgristockCapstoneProject" />
+
+        <!-- Sign Up Activity -->
+        <activity
+            android:name=".login.SignUpActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AgristockCapstoneProject" />
+
+        <!-- Email Verification Activity -->
+        <activity
+            android:name=".login.EmailVerificationActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AgristockCapstoneProject" />
+
+        <!-- Notifications Activity -->
+        <activity
+            android:name=".NotificationActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AgristockCapstoneProject" />
+
+        <!-- Profile Activity -->
+        <activity
+            android:name=".ProfileActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AgristockCapstoneProject" />
+
+        <!-- Edit Post Activity -->
+        <activity
+            android:name=".EditPostActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AgristockCapstoneProject" />
+
+        <!-- Search Activity -->
+        <activity
+            android:name=".SearchActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AgristockCapstoneProject" />
+
+        <!-- Favorites Activity -->
+        <activity
+            android:name=".FavoritesActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AgristockCapstoneProject" />
+
+        <!-- Sell Post Activity -->
+        <activity
+            android:name=".SellPostActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AgristockCapstoneProject" />
+
+        <!-- Sold Items Activity -->
+        <activity
+            android:name=".SoldItemsActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AgristockCapstoneProject" />
+
+        <!-- Item Details Activity -->
+        <activity
+            android:name=".ItemDetailsActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AgristockCapstoneProject" />
+
+        <!-- Settings Activity -->
+        <activity
+            android:name=".SettingsActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AgristockCapstoneProject" />
+
+        <!-- Verification Activity -->
+        <activity
+            android:name=".VerificationActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AgristockCapstoneProject" />
+
+        <!-- Image Cropper Activity -->
+        <activity
+            android:name=".ImageCropperActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AgristockCapstoneProject" />
+
+        <!-- Image Viewer Activity -->
+        <activity
+            android:name=".ImageViewerActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AgristockCapstoneProject" />
+
+        <!-- View Bidding Activity -->
+        <activity
+            android:name=".ViewBiddingActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AgristockCapstoneProject" />
+
+        <!-- Live Bidding Activity -->
+        <activity
+            android:name=".LiveBiddingActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AgristockCapstoneProject" />
+
+        <!-- Home Activity (if you want to keep it separate) -->
+        <!-- Removed HomeActivity reference if not implemented -->
+
+        <!-- FileProvider for sharing files -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+    </application>
+
+</manifest>

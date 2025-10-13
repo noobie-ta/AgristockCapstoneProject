@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Primary Colors -->
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="yellow">#FFD700</color>
+    
+    <!-- Modern Color Palette -->
+    <color name="yellow_accent">#FFD700</color>
+    <color name="yellow_light">#FFF8DC</color>
+    <color name="yellow_dark">#B8860B</color>
+    
+    <!-- Grays -->
+    <color name="gray_50">#FAFAFA</color>
+    <color name="gray_100">#F5F5F5</color>
+    <color name="gray_200">#EEEEEE</color>
+    <color name="gray_300">#E0E0E0</color>
+    <color name="gray_400">#BDBDBD</color>
+    <color name="gray_500">#9E9E9E</color>
+    <color name="gray_600">#757575</color>
+    <color name="gray_700">#616161</color>
+    <color name="gray_800">#424242</color>
+    <color name="gray_900">#212121</color>
+    
+    <!-- Text Colors -->
+    <color name="text_primary">#212121</color>
+    <color name="text_secondary">#757575</color>
+    <color name="text_hint">#9E9E9E</color>
+    
+    <!-- Button Colors -->
+    <color name="button_sell_text">#D32F2F</color>
+    <color name="button_bid_text">#1976D2</color>
+    <color name="red_accent">#D32F2F</color>
+    
+    <!-- Background Colors -->
+    <color name="background_primary">#FFFFFF</color>
+    <color name="background_secondary">#F5F5F5</color>
+    
+    <!-- Shadow Colors -->
+    <color name="shadow_light">#1A000000</color>
+    <color name="shadow_medium">#33000000</color>
+    
+    <!-- Bidding Colors -->
+    <color name="light_yellow">#FFF8E1</color>
+    <color name="blue_accent">#2196F3</color>
+</resources>
