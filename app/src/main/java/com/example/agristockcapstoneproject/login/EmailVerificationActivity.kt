@@ -1,4 +1,4 @@
-package com.example.agristockcapstoneproject
+package com.example.agristockcapstoneproject.login
 
 import android.content.Intent
 import android.os.Bundle
@@ -7,12 +7,13 @@ import android.util.Log
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.example.agristockcapstoneproject.databinding.ActivityEmailVerificationBinding
+import com.example.agristockcapstoneproject.MainActivity
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.UserProfileChangeRequest
 import com.google.firebase.firestore.FirebaseFirestore
 import java.util.*
 
-class   EmailVerificationActivity : AppCompatActivity() {
+class EmailVerificationActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityEmailVerificationBinding
     private lateinit var auth: FirebaseAuth

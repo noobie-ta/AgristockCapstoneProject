@@ -25,7 +25,7 @@
                 android:layout_width="32dp"
                 android:layout_height="32dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="Back"
+                android:contentDescription="@string/back"
                 android:padding="4dp"
                 android:src="@drawable/ic_arrow_back" />
 
@@ -34,7 +34,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:gravity="center"
-                android:text="SELL"
+                android:text="@string/sell"
                 android:textColor="#D32F2F"
                 android:textSize="24sp"
                 android:textStyle="bold" />
@@ -56,7 +56,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="8dp"
-                android:text="Upload Image"
+                android:text="@string/upload_image"
                 android:textColor="@color/black"
                 android:textSize="16sp"
                 android:textStyle="bold" />
@@ -96,7 +96,7 @@
                         android:layout_width="48dp"
                         android:layout_height="48dp"
                         android:src="@drawable/ic_image_upload"
-                        android:tint="#999999" />
+                        />
 
                     <TextView
                         android:layout_width="wrap_content"

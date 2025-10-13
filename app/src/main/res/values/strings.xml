@@ -42,4 +42,9 @@
         libero vel nunc consequat, quis tincidunt nisl eleifend. Cras bibendum enim a justo luctus
         vestibulum. Fusce dictum libero quis erat maximus, vitae volutpat diam dignissim.
     </string>
+    <string name="add_image">+ Add Image</string>
+    <string name="remove_image">Remove image</string>
+    <string name="back">Back</string>
+    <string name="sell">SELL</string>
+    <string name="upload_image">Upload Image</string>
 </resources>

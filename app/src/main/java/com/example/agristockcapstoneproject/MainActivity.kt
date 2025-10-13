@@ -73,8 +73,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.btnBid.setOnClickListener {
-            // TODO: Navigate to bid activity
-            Toast.makeText(this, "Bid functionality coming soon!", Toast.LENGTH_SHORT).show()
+            startActivity(Intent(this, BidPostActivity::class.java))
         }
 
         // Filter buttons
