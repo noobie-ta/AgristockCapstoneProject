@@ -98,7 +98,6 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="8dp"
-                            android:text="@string/add_image"
                             android:textColor="@color/gray_500"
                             android:textSize="14sp" />
 
@@ -112,7 +111,6 @@
                         android:layout_gravity="top|end"
                         android:layout_margin="8dp"
                         android:background="@drawable/circle_white_background"
-                        android:contentDescription="@string/remove_image"
                         android:padding="4dp"
                         android:src="@drawable/ic_close"
                         android:visibility="gone" />
@@ -454,4 +452,3 @@
     </ScrollView>
 
 </layout>
-
