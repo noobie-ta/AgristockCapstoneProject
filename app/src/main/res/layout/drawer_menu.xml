@@ -87,9 +87,9 @@
         android:background="#E0E0E0"
         android:layout_marginStart="56dp" />
 
-    <!-- Notifications -->
+    <!-- Subscription -->
     <LinearLayout
-        android:id="@+id/menu_notifications"
+        android:id="@+id/menu_subscription"
         android:layout_width="match_parent"
         android:layout_height="56dp"
         android:orientation="horizontal"
@@ -101,15 +101,15 @@
         <ImageView
             android:layout_width="24dp"
             android:layout_height="24dp"
-            android:src="@drawable/ic_bell"
+            android:src="@drawable/ic_star_filled"
             android:layout_marginEnd="16dp"
-            android:tint="#666666" />
+            android:tint="#FFD700" />
 
         <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Notifications"
+            android:text="Subscription"
             android:textColor="#000000"
             android:textSize="16sp" />
 
@@ -173,28 +173,36 @@
     <LinearLayout
         android:id="@+id/menu_logout"
         android:layout_width="match_parent"
-        android:layout_height="56dp"
+        android:layout_height="64dp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:paddingStart="24dp"
         android:paddingEnd="24dp"
-        android:background="?attr/selectableItemBackground">
+        android:background="@drawable/logout_button_background"
+        android:layout_margin="8dp"
+        android:elevation="2dp">
 
         <ImageView
-            android:layout_width="24dp"
-            android:layout_height="24dp"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
             android:src="@drawable/ic_logout"
             android:layout_marginEnd="16dp"
-            android:tint="#FF6B6B" />
+            android:tint="#FFFFFF" />
 
         <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="Logout"
-            android:textColor="#FF6B6B"
-            android:textSize="16sp"
+            android:textColor="#FFFFFF"
+            android:textSize="18sp"
             android:textStyle="bold" />
+
+        <ImageView
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:src="@android:drawable/ic_menu_more"
+            android:tint="#FFFFFF" />
 
     </LinearLayout>
 

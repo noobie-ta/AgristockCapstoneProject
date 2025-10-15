@@ -78,10 +78,11 @@ class ProfileActivity : AppCompatActivity() {
 		super.onCreate(savedInstanceState)
 		setContentView(R.layout.activity_profile)
 
-        // Configure status bar to blend with white top bar (non-deprecated APIs)
-        WindowCompat.setDecorFitsSystemWindows(window, false)
+        // Configure status bar with dark background and white icons for consistency
+        WindowCompat.setDecorFitsSystemWindows(window, true)
+        window.statusBarColor = ContextCompat.getColor(this, android.R.color.black)
         val insetsController = WindowCompat.getInsetsController(window, window.decorView)
-        insetsController.isAppearanceLightStatusBars = true
+        insetsController.isAppearanceLightStatusBars = false
 
 		postsContainer = findViewById(R.id.ll_posts_container)
 		avatarView = findViewById(R.id.iv_avatar)

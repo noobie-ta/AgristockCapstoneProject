@@ -53,10 +53,11 @@ class LiveBiddingActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_live_bidding)
 
-        // Configure status bar
-        WindowCompat.setDecorFitsSystemWindows(window, false)
+        // Configure status bar with dark background and white icons for consistency
+        WindowCompat.setDecorFitsSystemWindows(window, true)
+        window.statusBarColor = ContextCompat.getColor(this, android.R.color.black)
         val insetsController = WindowCompat.getInsetsController(window, window.decorView)
-        insetsController.isAppearanceLightStatusBars = true
+        insetsController.isAppearanceLightStatusBars = false
 
         initializeViews()
         setupClickListeners()

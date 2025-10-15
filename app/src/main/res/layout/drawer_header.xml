@@ -29,20 +29,6 @@
         android:textSize="18sp"
         android:textStyle="bold" />
 
-    <!-- Edit Profile Button -->
-    <TextView
-        android:id="@+id/btn_edit_profile"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center_horizontal"
-        android:background="@drawable/button_edit_profile"
-        android:paddingStart="16dp"
-        android:paddingTop="8dp"
-        android:paddingEnd="16dp"
-        android:paddingBottom="8dp"
-        android:text="Edit Profile"
-        android:textColor="#000000"
-        android:textSize="14sp"
-        android:textStyle="bold" />
+    <!-- Removed Edit Profile button per design update -->
 
 </LinearLayout>

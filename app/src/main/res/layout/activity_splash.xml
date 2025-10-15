@@ -12,8 +12,8 @@
         android:layout_width="120dp"
         android:layout_height="120dp"
         android:layout_marginBottom="24dp"
-        android:src="@drawable/ic_agristock_logo"
-        android:contentDescription="AgriStock Logo" />
+        android:contentDescription="AgriStock Logo"
+        android:src="@drawable/ic_agristock_logo" />
 
     <TextView
         android:layout_width="wrap_content"

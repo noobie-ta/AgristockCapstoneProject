@@ -34,10 +34,11 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Configure status bar to blend with white top bar (non-deprecated APIs)
-        WindowCompat.setDecorFitsSystemWindows(window, false)
+        // Configure status bar with dark background and white icons for consistency
+        WindowCompat.setDecorFitsSystemWindows(window, true)
+        window.statusBarColor = ContextCompat.getColor(this, android.R.color.black)
         val insetsController = WindowCompat.getInsetsController(window, window.decorView)
-        insetsController.isAppearanceLightStatusBars = true
+        insetsController.isAppearanceLightStatusBars = false
 
         auth = FirebaseAuth.getInstance()
         firestore = FirebaseFirestore.getInstance()
@@ -147,11 +148,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupDrawerMenu() {
-        // Edit Profile button
-        findViewById<TextView>(R.id.btn_edit_profile).setOnClickListener {
-            drawerLayout.closeDrawer(GravityCompat.START)
-            startActivity(Intent(this, ProfileActivity::class.java))
-        }
+        // Edit Profile button removed
 
         // Menu items
         findViewById<LinearLayout>(R.id.menu_verification).setOnClickListener {
@@ -164,9 +161,9 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this, SettingsActivity::class.java))
         }
 
-        findViewById<LinearLayout>(R.id.menu_notifications).setOnClickListener {
+        findViewById<LinearLayout>(R.id.menu_subscription).setOnClickListener {
             drawerLayout.closeDrawer(GravityCompat.START)
-            startActivity(Intent(this, NotificationActivity::class.java))
+            Toast.makeText(this, "Subscriptions coming soon!", Toast.LENGTH_SHORT).show()
         }
 
         findViewById<LinearLayout>(R.id.menu_sold_items).setOnClickListener {
