@@ -43,26 +43,28 @@ class BidPostActivity : AppCompatActivity() {
 
     // Image picker launcher
     private val imagePickerLauncher = registerForActivityResult(
-        ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        uri?.let { selectedUri ->
-            selectedImageUri = selectedUri
-            displaySelectedImage(selectedUri)
-            updatePreview()
-        }
-    }
-
-    // Camera launcher
-    private val cameraLauncher = registerForActivityResult(
-        ActivityResultContracts.TakePicture()
-    ) { success ->
-        if (success) {
-            selectedImageUri?.let { uri ->
-                displaySelectedImage(uri)
+        ActivityResultContracts.GetContent(),
+        androidx.activity.result.ActivityResultCallback<Uri?> { uri ->
+            uri?.let { selectedUri ->
+                selectedImageUri = selectedUri
+                displaySelectedImage(selectedUri)
                 updatePreview()
             }
         }
-    }
+    )
+
+    // Camera launcher
+    private val cameraLauncher = registerForActivityResult(
+        ActivityResultContracts.TakePicture(),
+        androidx.activity.result.ActivityResultCallback<Boolean> { success ->
+            if (success) {
+                selectedImageUri?.let { uri ->
+                    displaySelectedImage(uri)
+                    updatePreview()
+                }
+            }
+        }
+    )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -103,9 +105,9 @@ class BidPostActivity : AppCompatActivity() {
             finish()
         }
 
-        // Image upload
+        // Image upload - open gallery directly
         binding.flImageUploadArea.setOnClickListener {
-            showImageSourceDialog()
+            openGallery()
         }
 
         // Remove image
@@ -162,18 +164,7 @@ class BidPostActivity : AppCompatActivity() {
         })
     }
 
-    private fun showImageSourceDialog() {
-        val options = arrayOf("Camera", "Gallery")
-        androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle("Select Image Source")
-            .setItems(options) { _, which ->
-                when (which) {
-                    0 -> openCamera()
-                    1 -> openGallery()
-                }
-            }
-            .show()
-    }
+    // Removed image source dialog; gallery opens directly from click listener
 
     private fun openCamera() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) 
@@ -345,13 +336,34 @@ class BidPostActivity : AppCompatActivity() {
     }
 
     private fun uploadImageAndPost(imageUri: Uri) {
-        val imageRef = storage.reference.child("bid_images/${UUID.randomUUID()}.jpg")
+        val currentUser = auth.currentUser
+        if (currentUser == null) {
+            Toast.makeText(this, "You must be logged in to upload images", Toast.LENGTH_SHORT).show()
+            binding.btnPostItem.isEnabled = true
+            binding.btnPostItem.text = "Post Item"
+            return
+        }
+
+        val imageRef = storage.reference.child("bid_images/${currentUser.uid}_${System.currentTimeMillis()}.jpg")
         
-        imageRef.putFile(imageUri)
-            .addOnSuccessListener { taskSnapshot ->
-                imageRef.downloadUrl.addOnSuccessListener { downloadUri ->
-                    createBidPost(downloadUri.toString())
-                }
+        // Add metadata to the upload
+        val metadata = com.google.firebase.storage.StorageMetadata.Builder()
+            .setContentType("image/jpeg")
+            .setCustomMetadata("userId", currentUser.uid)
+            .setCustomMetadata("uploadTime", System.currentTimeMillis().toString())
+            .build()
+        
+        imageRef.putFile(imageUri, metadata)
+            .addOnSuccessListener {
+                imageRef.downloadUrl
+                    .addOnSuccessListener { downloadUri ->
+                        createBidPost(downloadUri.toString())
+                    }
+                    .addOnFailureListener { exception ->
+                        Toast.makeText(this, "Failed to get image URL: ${exception.message}", Toast.LENGTH_SHORT).show()
+                        binding.btnPostItem.isEnabled = true
+                        binding.btnPostItem.text = "Post Item"
+                    }
             }
             .addOnFailureListener { exception ->
                 Toast.makeText(this, "Failed to upload image: ${exception.message}", Toast.LENGTH_SHORT).show()
@@ -367,8 +379,10 @@ class BidPostActivity : AppCompatActivity() {
         val bidPost = hashMapOf(
             "userId" to currentUser.uid,
             "userEmail" to currentUser.email,
+            "title" to binding.etItemName.text.toString().trim(), // Use 'title' for consistency
             "itemName" to binding.etItemName.text.toString().trim(),
             "description" to binding.etDescription.text.toString().trim(),
+            "price" to "₱${binding.etStartingBid.text.toString().trim()}", // Add price field for consistency
             "startingBid" to binding.etStartingBid.text.toString().trim().toDouble(),
             "currentBid" to binding.etStartingBid.text.toString().trim().toDouble(),
             "category" to categories[binding.spinnerCategory.selectedItemPosition],
@@ -376,9 +390,12 @@ class BidPostActivity : AppCompatActivity() {
             "imageUrl" to imageUrl,
             "endTime" to selectedEndDate!!.timeInMillis,
             "createdAt" to currentTime,
+            "timestamp" to currentTime, // Add timestamp for consistency
+            "datePosted" to java.text.SimpleDateFormat("MMM dd, yyyy", java.util.Locale.getDefault()).format(java.util.Date()),
             "type" to "BID",
             "status" to "ACTIVE",
-            "bidCount" to 0
+            "bidCount" to 0,
+            "favoriteCount" to 0L // Initialize favorite count
         )
 
         firestore.collection("posts")

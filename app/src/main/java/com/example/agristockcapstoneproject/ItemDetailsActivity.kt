@@ -60,6 +60,15 @@ class ItemDetailsActivity : AppCompatActivity() {
 		loadPost(postId)
 	}
 
+	override fun onResume() {
+		super.onResume()
+		// Refresh favorite status when returning to the activity
+		val postId = intent.getStringExtra("postId")
+		if (!postId.isNullOrEmpty()) {
+			checkFavoriteStatus(postId)
+		}
+	}
+
 	private fun loadPost(postId: String) {
 		firestore.collection("posts").document(postId).get()
 			.addOnSuccessListener { doc ->
@@ -134,61 +143,120 @@ class ItemDetailsActivity : AppCompatActivity() {
 			// Placeholder: could open chat or dialer
 			Toast.makeText(this, "Contact Seller", Toast.LENGTH_SHORT).show()
 		}
-		var favorited = false
 
 		// Initialize favorite state from Firestore
-		auth.currentUser?.uid?.let { uid ->
-			firestore.collection("users").document(uid)
-				.collection("favorites").document(postId)
-				.get()
-				.addOnSuccessListener { doc ->
-					favorited = doc.exists()
-					if (favorited) {
-						btnSave.setImageResource(R.drawable.ic_favorite_filled_red)
-						btnSave.clearColorFilter()
-						tvFavoritedLabel.visibility = android.view.View.VISIBLE
-					} else {
-						btnSave.setImageResource(R.drawable.ic_favorite_border)
-						btnSave.colorFilter = null
-						tvFavoritedLabel.visibility = android.view.View.GONE
-					}
-				}
-		}
+		checkFavoriteStatus(postId)
 
-		btnSave.setOnClickListener {
-			favorited = !favorited
-			if (favorited) {
-				btnSave.setImageResource(R.drawable.ic_favorite_filled_red)
-				btnSave.clearColorFilter()
-				tvFavoritedLabel.visibility = android.view.View.VISIBLE
-				Toast.makeText(this, "Item added to favorites", Toast.LENGTH_SHORT).show()
+        btnSave.setOnClickListener {
+            val uid = auth.currentUser?.uid
+            if (uid == null) {
+                Toast.makeText(this, "Please log in to save favorites", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            
+            // Disable button during operation to prevent multiple clicks
+            btnSave.isEnabled = false
+            
+            // Heart pop animation
+            val anim = android.animation.ObjectAnimator.ofPropertyValuesHolder(
+                btnSave,
+                android.animation.PropertyValuesHolder.ofFloat("scaleX", 1f, 1.2f, 1f),
+                android.animation.PropertyValuesHolder.ofFloat("scaleY", 1f, 1.2f, 1f)
+            ).apply { duration = 180; interpolator = android.view.animation.OvershootInterpolator() }
+            anim.start()
 
-				// Persist to Firestore
-				auth.currentUser?.uid?.let { uid ->
-					val data = hashMapOf(
-						"postId" to postId,
-						"title" to tvItemName.text.toString(),
-						"price" to tvItemPrice.text.toString(),
-						"imageUrl" to (currentImageUrl ?: ""),
-						"date" to tvTimePosted.text.toString(),
-						"createdAt" to com.google.firebase.Timestamp.now()
-					)
-					firestore.collection("users").document(uid)
-						.collection("favorites").document(postId)
-						.set(data)
-				}
-			} else {
-				btnSave.setImageResource(R.drawable.ic_favorite_border)
-				btnSave.colorFilter = null
-				tvFavoritedLabel.visibility = android.view.View.GONE
-
-				// Remove from Firestore
-				auth.currentUser?.uid?.let { uid ->
-					firestore.collection("users").document(uid)
-						.collection("favorites").document(postId)
-						.delete()
-				}
-			}
-		}
+            val userFavRef = firestore.collection("users").document(uid).collection("favorites").document(postId)
+            val postRef = firestore.collection("posts").document(postId)
+            
+            // First check current favorite status
+            userFavRef.get().addOnSuccessListener { favDoc ->
+                val isCurrentlyFav = favDoc.exists()
+                
+                if (isCurrentlyFav) {
+                    // Remove from favorites
+                    userFavRef.delete()
+                        .addOnSuccessListener {
+                            // Update post favorite count
+                            postRef.update("favoriteCount", com.google.firebase.firestore.FieldValue.increment(-1))
+                                .addOnSuccessListener {
+                                    updateFavoriteUI(false)
+                                    Toast.makeText(this, "Removed from favorites", Toast.LENGTH_SHORT).show()
+                                    btnSave.isEnabled = true
+                                }
+                                .addOnFailureListener { exception ->
+                                    Toast.makeText(this, "Failed to update count: ${exception.message}", Toast.LENGTH_SHORT).show()
+                                    btnSave.isEnabled = true
+                                }
+                        }
+                        .addOnFailureListener { exception ->
+                            Toast.makeText(this, "Failed to remove favorite: ${exception.message}", Toast.LENGTH_SHORT).show()
+                            btnSave.isEnabled = true
+                        }
+                } else {
+                    // Add to favorites
+                    val data = hashMapOf(
+                        "postId" to postId,
+                        "title" to tvItemName.text.toString(),
+                        "price" to tvItemPrice.text.toString(),
+                        "imageUrl" to (currentImageUrl ?: ""),
+                        "date" to tvTimePosted.text.toString(),
+                        "createdAt" to com.google.firebase.Timestamp.now()
+                    )
+                    
+                    userFavRef.set(data)
+                        .addOnSuccessListener {
+                            // Update post favorite count
+                            postRef.update("favoriteCount", com.google.firebase.firestore.FieldValue.increment(1))
+                                .addOnSuccessListener {
+                                    updateFavoriteUI(true)
+                                    Toast.makeText(this, "Added to favorites", Toast.LENGTH_SHORT).show()
+                                    btnSave.isEnabled = true
+                                }
+                                .addOnFailureListener { exception ->
+                                    Toast.makeText(this, "Failed to update count: ${exception.message}", Toast.LENGTH_SHORT).show()
+                                    btnSave.isEnabled = true
+                                }
+                        }
+                        .addOnFailureListener { exception ->
+                            Toast.makeText(this, "Failed to add favorite: ${exception.message}", Toast.LENGTH_SHORT).show()
+                            btnSave.isEnabled = true
+                        }
+                }
+            }.addOnFailureListener { exception ->
+                Toast.makeText(this, "Failed to check favorite status: ${exception.message}", Toast.LENGTH_SHORT).show()
+                btnSave.isEnabled = true
+            }
+        }
 	}
+
+    private fun checkFavoriteStatus(postId: String) {
+        val uid = auth.currentUser?.uid
+        if (uid == null) {
+            updateFavoriteUI(false)
+            return
+        }
+        
+        firestore.collection("users").document(uid)
+            .collection("favorites").document(postId)
+            .get()
+            .addOnSuccessListener { doc ->
+                val isFavorited = doc.exists()
+                updateFavoriteUI(isFavorited)
+            }
+            .addOnFailureListener {
+                updateFavoriteUI(false)
+            }
+    }
+
+    private fun updateFavoriteUI(isFavorited: Boolean) {
+        if (isFavorited) {
+            btnSave.setImageResource(R.drawable.ic_favorite_filled_red)
+            btnSave.clearColorFilter()
+            tvFavoritedLabel.visibility = android.view.View.VISIBLE
+        } else {
+            btnSave.setImageResource(R.drawable.ic_favorite_border)
+            btnSave.colorFilter = null
+            tvFavoritedLabel.visibility = android.view.View.GONE
+        }
+    }
 }

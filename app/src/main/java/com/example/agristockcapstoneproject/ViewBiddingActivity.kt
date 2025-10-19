@@ -17,7 +17,7 @@ import java.util.*
 class ViewBiddingActivity : AppCompatActivity() {
 
     private lateinit var backButton: ImageView
-    private lateinit var favoriteButton: ImageView
+    // favoriteButton removed - favorite functionality moved to View Item page
     private lateinit var itemImageView: ImageView
     private lateinit var itemNameText: TextView
     private lateinit var sellerNameText: TextView
@@ -33,7 +33,6 @@ class ViewBiddingActivity : AppCompatActivity() {
     private val firestore: FirebaseFirestore by lazy { FirebaseFirestore.getInstance() }
     
     private var countdownTimer: CountDownTimer? = null
-    private var isFavorite = false
     private var itemId: String? = null
     private var biddingEndTime: Long = 0
 
@@ -54,7 +53,7 @@ class ViewBiddingActivity : AppCompatActivity() {
 
     private fun initializeViews() {
         backButton = findViewById(R.id.btn_back)
-        favoriteButton = findViewById(R.id.btn_favorite)
+        // favoriteButton removed - favorite functionality moved to View Item page
         itemImageView = findViewById(R.id.iv_item_image)
         itemNameText = findViewById(R.id.tv_item_name)
         sellerNameText = findViewById(R.id.tv_seller_name)
@@ -70,9 +69,7 @@ class ViewBiddingActivity : AppCompatActivity() {
     private fun setupClickListeners() {
         backButton.setOnClickListener { finish() }
         
-        favoriteButton.setOnClickListener {
-            toggleFavorite()
-        }
+        // Favorite functionality removed - users should use the View Item page to manage favorites
         
         showLiveBiddingButton.setOnClickListener {
             val intent = Intent(this, LiveBiddingActivity::class.java)
@@ -126,9 +123,6 @@ class ViewBiddingActivity : AppCompatActivity() {
                     // Set bidding end time and start countdown
                     biddingEndTime = data["biddingEndTime"]?.toString()?.toLongOrNull() ?: System.currentTimeMillis() + 86400000 // Default 24 hours
                     startCountdown()
-                    
-                    // Check if item is in favorites
-                    checkFavoriteStatus()
                 } else {
                     Toast.makeText(this, "Item not found", Toast.LENGTH_SHORT).show()
                     finish()
@@ -164,68 +158,7 @@ class ViewBiddingActivity : AppCompatActivity() {
         }
     }
 
-    private fun checkFavoriteStatus() {
-        val user = auth.currentUser
-        if (user != null) {
-            firestore.collection("favorites")
-                .whereEqualTo("userId", user.uid)
-                .whereEqualTo("itemId", itemId)
-                .get()
-                .addOnSuccessListener { documents ->
-                    isFavorite = !documents.isEmpty
-                    updateFavoriteButton()
-                }
-        }
-    }
-
-    private fun toggleFavorite() {
-        val user = auth.currentUser
-        if (user == null) {
-            Toast.makeText(this, "Please log in to save favorites", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        if (isFavorite) {
-            // Remove from favorites
-            firestore.collection("favorites")
-                .whereEqualTo("userId", user.uid)
-                .whereEqualTo("itemId", itemId)
-                .get()
-                .addOnSuccessListener { documents ->
-                    for (document in documents) {
-                        document.reference.delete()
-                    }
-                    isFavorite = false
-                    updateFavoriteButton()
-                    Toast.makeText(this, "Removed from favorites", Toast.LENGTH_SHORT).show()
-                }
-        } else {
-            // Add to favorites
-            val favoriteData = hashMapOf(
-                "userId" to user.uid,
-                "itemId" to itemId,
-                "timestamp" to System.currentTimeMillis()
-            )
-            
-            firestore.collection("favorites")
-                .add(favoriteData)
-                .addOnSuccessListener {
-                    isFavorite = true
-                    updateFavoriteButton()
-                    Toast.makeText(this, "Added to favorites", Toast.LENGTH_SHORT).show()
-                }
-        }
-    }
-
-    private fun updateFavoriteButton() {
-        if (isFavorite) {
-            favoriteButton.setImageResource(R.drawable.ic_favorite_filled)
-            favoriteButton.setColorFilter(ContextCompat.getColor(this, android.R.color.holo_red_dark))
-        } else {
-            favoriteButton.setImageResource(R.drawable.ic_favorite_border)
-            favoriteButton.setColorFilter(ContextCompat.getColor(this, android.R.color.black))
-        }
-    }
+    // Favorite functionality removed - users should use the View Item page to manage favorites
 
     override fun onDestroy() {
         super.onDestroy()

@@ -272,26 +272,81 @@
 
             <!-- Bottom Navigation Bar (Floating) -->
 
-            <ScrollView
+            <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+                android:id="@+id/srl_home_refresh"
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
-                android:layout_weight="1"
-                android:background="@color/background_secondary"
-                android:padding="12dp"
-                android:fillViewport="true">
+                android:layout_weight="1">
 
-                <LinearLayout
-                    android:id="@+id/ll_posts_container"
+                <ScrollView
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical">
+                    android:layout_height="match_parent"
+                    android:background="@color/background_secondary"
+                    android:padding="12dp"
+                    android:fillViewport="true">
 
-                    <!-- Posts will be added dynamically here -->
-                    <!-- Empty state will be shown when no posts -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical">
 
-                </LinearLayout>
+                        <!-- View Toggle Options -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="end"
+                            android:layout_marginBottom="12dp">
 
-            </ScrollView>
+                            <LinearLayout
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:orientation="horizontal"
+                                android:background="@drawable/view_toggle_background"
+                                android:padding="2dp">
+
+                                <ImageView
+                                    android:id="@+id/btn_list_view_home"
+                                    android:layout_width="32dp"
+                                    android:layout_height="32dp"
+                                    android:background="@drawable/view_toggle_active"
+                                    android:src="@drawable/ic_list_view"
+                                    android:padding="6dp"
+                                    android:clickable="true"
+                                    android:focusable="true"
+                                    android:contentDescription="List View" />
+
+                                <ImageView
+                                    android:id="@+id/btn_grid_view_home"
+                                    android:layout_width="32dp"
+                                    android:layout_height="32dp"
+                                    android:layout_marginStart="2dp"
+                                    android:background="@drawable/view_toggle_inactive"
+                                    android:src="@drawable/ic_grid_view"
+                                    android:padding="6dp"
+                                    android:clickable="true"
+                                    android:focusable="true"
+                                    android:contentDescription="Grid View" />
+
+                            </LinearLayout>
+
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:id="@+id/ll_posts_container"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical">
+
+                            <!-- Posts will be added dynamically here -->
+                            <!-- Empty state will be shown when no posts -->
+
+                        </LinearLayout>
+
+                    </LinearLayout>
+
+                </ScrollView>
+            </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
             <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"

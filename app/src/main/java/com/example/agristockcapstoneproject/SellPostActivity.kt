@@ -205,26 +205,43 @@ class SellPostActivity : AppCompatActivity() {
 
     private fun uploadImageToStorage(uri: Uri, callback: (String?) -> Unit) {
         val user = auth.currentUser ?: run {
+            showError("You must be logged in to upload images")
+            callback(null)
+            return
+        }
+
+        // Ensure user is authenticated before uploading
+        if (user.uid.isBlank()) {
+            showError("Invalid user authentication")
             callback(null)
             return
         }
 
         val timestamp = System.currentTimeMillis()
         val imageRef = storage.reference.child("post_images/${user.uid}_${timestamp}.jpg")
-        imageRef.putFile(uri)
-                .continueWithTask { task ->
-                    if (!task.isSuccessful) {
-                        throw task.exception ?: RuntimeException("Upload failed")
+
+        // Add metadata to the upload
+        val metadata = com.google.firebase.storage.StorageMetadata.Builder()
+            .setContentType("image/jpeg")
+            .setCustomMetadata("userId", user.uid)
+            .setCustomMetadata("uploadTime", timestamp.toString())
+            .build()
+
+        imageRef.putFile(uri, metadata)
+            .addOnSuccessListener { taskSnapshot ->
+                imageRef.downloadUrl
+                    .addOnSuccessListener { downloadUri ->
+                        callback(downloadUri.toString())
                     }
-                    imageRef.downloadUrl
-                }
-                .addOnSuccessListener { downloadUri ->
-                    callback(downloadUri.toString())
-                }
-                .addOnFailureListener { exception ->
-                    showError("Upload failed: ${exception.message}")
-                    callback(null)
-                }
+                    .addOnFailureListener { exception ->
+                        showError("Failed to get image URL: ${exception.message}")
+                        callback(null)
+                    }
+            }
+            .addOnFailureListener { exception ->
+                showError("Upload failed: ${exception.message}")
+                callback(null)
+            }
     }
 
     private fun uploadAllImagesThenPost() {
@@ -272,11 +289,13 @@ class SellPostActivity : AppCompatActivity() {
             "description" to description,
             "category" to category,
             "imageUrls" to uploadedImageUrls,
+            "imageUrl" to uploadedImageUrls.firstOrNull(), // Store first image for compatibility
             "timestamp" to timestamp,
             "datePosted" to datePosted,
             "status" to "Available",
             "sellerName" to (user.displayName ?: "Unknown Seller"),
-            "location" to "Manila" // You can add location picker later
+            "location" to "Manila", // You can add location picker later
+            "favoriteCount" to 0L // Initialize favorite count
         )
 
         firestore.collection("posts")
