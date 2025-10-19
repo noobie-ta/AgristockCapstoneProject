@@ -87,7 +87,7 @@ class LiveBiddingActivity : AppCompatActivity() {
     }
 
     private fun loadBiddingData() {
-        itemId = intent.getStringExtra("itemId")
+        itemId = intent.getStringExtra("postId")
         if (itemId.isNullOrEmpty()) {
             Toast.makeText(this, "Item not found", Toast.LENGTH_SHORT).show()
             finish()

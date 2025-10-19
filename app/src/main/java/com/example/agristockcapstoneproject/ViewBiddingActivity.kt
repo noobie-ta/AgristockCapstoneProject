@@ -20,6 +20,7 @@ class ViewBiddingActivity : AppCompatActivity() {
     private lateinit var favoriteButton: ImageView
     private lateinit var itemImageView: ImageView
     private lateinit var itemNameText: TextView
+    private lateinit var sellerAvatar: ImageView
     private lateinit var sellerNameText: TextView
     private lateinit var descriptionText: TextView
     private lateinit var countdownText: TextView
@@ -33,7 +34,6 @@ class ViewBiddingActivity : AppCompatActivity() {
     private val firestore: FirebaseFirestore by lazy { FirebaseFirestore.getInstance() }
     
     private var countdownTimer: CountDownTimer? = null
-    private var isFavorite = false
     private var itemId: String? = null
     private var biddingEndTime: Long = 0
 
@@ -57,6 +57,7 @@ class ViewBiddingActivity : AppCompatActivity() {
         favoriteButton = findViewById(R.id.btn_favorite)
         itemImageView = findViewById(R.id.iv_item_image)
         itemNameText = findViewById(R.id.tv_item_name)
+        sellerAvatar = findViewById(R.id.iv_seller_avatar)
         sellerNameText = findViewById(R.id.tv_seller_name)
         descriptionText = findViewById(R.id.tv_description)
         countdownText = findViewById(R.id.tv_countdown)
@@ -70,25 +71,25 @@ class ViewBiddingActivity : AppCompatActivity() {
     private fun setupClickListeners() {
         backButton.setOnClickListener { finish() }
         
+        // Favorite button functionality
         favoriteButton.setOnClickListener {
             toggleFavorite()
         }
         
         showLiveBiddingButton.setOnClickListener {
             val intent = Intent(this, LiveBiddingActivity::class.java)
-            intent.putExtra("itemId", itemId)
+            intent.putExtra("postId", itemId)
             startActivity(intent)
             // Modern Android handles transitions automatically
         }
         
         contactSellerButton.setOnClickListener {
-            // TODO: Implement contact seller functionality
-            Toast.makeText(this, "Contact seller feature coming soon!", Toast.LENGTH_SHORT).show()
+            contactSeller()
         }
     }
 
     private fun loadItemDetails() {
-        itemId = intent.getStringExtra("itemId")
+        itemId = intent.getStringExtra("postId")
         if (itemId.isNullOrEmpty()) {
             Toast.makeText(this, "Item not found", Toast.LENGTH_SHORT).show()
             finish()
@@ -103,15 +104,36 @@ class ViewBiddingActivity : AppCompatActivity() {
                     
                     // Load item details
                     itemNameText.text = data["title"]?.toString() ?: "Unknown Item"
-                    sellerNameText.text = "Seller: ${data["sellerName"]?.toString() ?: "Unknown"}"
                     descriptionText.text = data["description"]?.toString() ?: "No description available"
                     
-                    // Load image
+                    // Load seller information
+                    val sellerId = data["userId"]?.toString()
+                    val sellerName = data["sellerName"]?.toString() ?: ""
+                    
+                    // Debug logging
+                    android.util.Log.d("ViewBiddingActivity", "Post data - sellerId: $sellerId, sellerName: $sellerName")
+                    android.util.Log.d("ViewBiddingActivity", "All post fields: ${data.keys}")
+                    
+                    if (!sellerId.isNullOrEmpty()) {
+                        loadSellerInfo(sellerId, sellerName)
+                    } else {
+                        sellerNameText.text = "Seller: Unknown"
+                    }
+                    
+                    // Load image - try multiple sources
                     val imageUrl = data["imageUrls"]?.let { 
                         if (it is List<*> && it.isNotEmpty()) it[0].toString() else null
-                    }
+                    } ?: data["imageUrl"]?.toString()
+                    
                     if (!imageUrl.isNullOrEmpty()) {
-                        Glide.with(this).load(imageUrl).into(itemImageView)
+                        Glide.with(this)
+                            .load(imageUrl)
+                            .centerCrop()
+                            .placeholder(R.drawable.ic_image_placeholder)
+                            .error(R.drawable.ic_image_placeholder)
+                            .into(itemImageView)
+                    } else {
+                        itemImageView.setImageResource(R.drawable.ic_image_placeholder)
                     }
                     
                     // Set bidding details
@@ -119,15 +141,28 @@ class ViewBiddingActivity : AppCompatActivity() {
                     val highestBid = data["highestBid"]?.toString() ?: startingBid
                     val totalBidders = data["totalBidders"]?.toString() ?: "0"
                     
-                    startingBidText.text = "Starting Bid: $startingBid"
-                    highestBidText.text = "Highest Bid: $highestBid"
+                    startingBidText.text = "Starting Bid: ${formatPrice(startingBid)}"
+                    highestBidText.text = "Highest Bid: ${formatPrice(highestBid)}"
                     totalBiddersText.text = "Total Bidders: $totalBidders"
                     
                     // Set bidding end time and start countdown
-                    biddingEndTime = data["biddingEndTime"]?.toString()?.toLongOrNull() ?: System.currentTimeMillis() + 86400000 // Default 24 hours
+                    val biddingEndTimeString = data["biddingEndTime"]?.toString()
+                    if (!biddingEndTimeString.isNullOrEmpty()) {
+                        biddingEndTime = biddingEndTimeString.toLongOrNull() ?: System.currentTimeMillis() + 86400000
+                    } else {
+                        // If no biddingEndTime is set, calculate it from createdAt + 24 hours
+                        val createdAt = data["createdAt"]?.let { 
+                            if (it is com.google.firebase.Timestamp) {
+                                it.toDate().time
+                            } else {
+                                it.toString().toLongOrNull()
+                            }
+                        } ?: System.currentTimeMillis()
+                        biddingEndTime = createdAt + 86400000 // 24 hours from creation
+                    }
                     startCountdown()
                     
-                    // Check if item is in favorites
+                    // Check favorite status
                     checkFavoriteStatus()
                 } else {
                     Toast.makeText(this, "Item not found", Toast.LENGTH_SHORT).show()
@@ -146,85 +181,414 @@ class ViewBiddingActivity : AppCompatActivity() {
         if (timeLeft > 0) {
             countdownTimer = object : CountDownTimer(timeLeft, 1000) {
                 override fun onTick(millisUntilFinished: Long) {
-                    val hours = millisUntilFinished / (1000 * 60 * 60)
+                    val days = millisUntilFinished / (1000 * 60 * 60 * 24)
+                    val hours = (millisUntilFinished % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)
                     val minutes = (millisUntilFinished % (1000 * 60 * 60)) / (1000 * 60)
                     val seconds = (millisUntilFinished % (1000 * 60)) / 1000
                     
-                    countdownText.text = String.format("%02d:%02d:%02d", hours, minutes, seconds)
+                    countdownText.text = if (days > 0) {
+                        String.format("%d days, %02d:%02d:%02d", days, hours, minutes, seconds)
+                    } else {
+                        String.format("%02d:%02d:%02d", hours, minutes, seconds)
+                    }
                 }
                 
                 override fun onFinish() {
                     countdownText.text = "Bidding Ended"
                     countdownText.setTextColor(ContextCompat.getColor(this@ViewBiddingActivity, android.R.color.holo_red_dark))
+                    // Disable bidding when time expires
+                    disableBidding()
                 }
             }.start()
         } else {
             countdownText.text = "Bidding Ended"
             countdownText.setTextColor(ContextCompat.getColor(this, android.R.color.holo_red_dark))
+            // Disable bidding if time has already expired
+            disableBidding()
         }
     }
-
-    private fun checkFavoriteStatus() {
-        val user = auth.currentUser
-        if (user != null) {
-            firestore.collection("favorites")
-                .whereEqualTo("userId", user.uid)
-                .whereEqualTo("itemId", itemId)
-                .get()
-                .addOnSuccessListener { documents ->
-                    isFavorite = !documents.isEmpty
-                    updateFavoriteButton()
-                }
-        }
+    
+    private fun disableBidding() {
+        // Disable the live bidding button when time expires
+        showLiveBiddingButton.isEnabled = false
+        showLiveBiddingButton.alpha = 0.5f
+        showLiveBiddingButton.text = "Bidding Ended"
     }
-
+    
     private fun toggleFavorite() {
-        val user = auth.currentUser
-        if (user == null) {
+        val uid = auth.currentUser?.uid
+        if (uid == null) {
             Toast.makeText(this, "Please log in to save favorites", Toast.LENGTH_SHORT).show()
             return
         }
-
-        if (isFavorite) {
-            // Remove from favorites
-            firestore.collection("favorites")
-                .whereEqualTo("userId", user.uid)
-                .whereEqualTo("itemId", itemId)
-                .get()
-                .addOnSuccessListener { documents ->
-                    for (document in documents) {
-                        document.reference.delete()
-                    }
-                    isFavorite = false
-                    updateFavoriteButton()
-                    Toast.makeText(this, "Removed from favorites", Toast.LENGTH_SHORT).show()
-                }
-        } else {
-            // Add to favorites
-            val favoriteData = hashMapOf(
-                "userId" to user.uid,
-                "itemId" to itemId,
-                "timestamp" to System.currentTimeMillis()
-            )
+        
+        if (itemId.isNullOrEmpty()) return
+        
+        favoriteButton.isEnabled = false // Prevent rapid clicks
+        
+        val userFavRef = firestore.collection("users").document(uid).collection("favorites").document(itemId!!)
+        val postRef = firestore.collection("posts").document(itemId!!)
+        
+        // Check current favorite status
+        userFavRef.get().addOnSuccessListener { favDoc ->
+            val isCurrentlyFav = favDoc.exists()
             
-            firestore.collection("favorites")
-                .add(favoriteData)
-                .addOnSuccessListener {
-                    isFavorite = true
-                    updateFavoriteButton()
-                    Toast.makeText(this, "Added to favorites", Toast.LENGTH_SHORT).show()
-                }
+            if (isCurrentlyFav) {
+                // Remove from favorites
+                userFavRef.delete()
+                    .addOnSuccessListener {
+                        postRef.get().addOnSuccessListener { postDoc ->
+                            if (postDoc.exists()) {
+                                val currentCount = (postDoc.getLong("favoriteCount") ?: 0L).toInt()
+                                val newCount = maxOf(0, currentCount - 1)
+                                postRef.update("favoriteCount", newCount)
+                                    .addOnSuccessListener {
+                                        updateFavoriteUI(false)
+                                        Toast.makeText(this, "Removed from favorites", Toast.LENGTH_SHORT).show()
+                                        favoriteButton.isEnabled = true
+                                    }
+                                    .addOnFailureListener { exception ->
+                                        Toast.makeText(this, "Failed to update count: ${exception.message}", Toast.LENGTH_SHORT).show()
+                                        favoriteButton.isEnabled = true
+                                    }
+                            } else {
+                                updateFavoriteUI(false)
+                                Toast.makeText(this, "Removed from favorites", Toast.LENGTH_SHORT).show()
+                                favoriteButton.isEnabled = true
+                            }
+                        }
+                    }
+                    .addOnFailureListener { exception ->
+                        Toast.makeText(this, "Failed to remove favorite: ${exception.message}", Toast.LENGTH_SHORT).show()
+                        favoriteButton.isEnabled = true
+                    }
+            } else {
+                // Add to favorites
+                val data = hashMapOf(
+                    "postId" to itemId,
+                    "title" to itemNameText.text.toString(),
+                    "price" to startingBidText.text.toString().replace("Starting Bid: ", ""),
+                    "imageUrl" to "", // Will be updated if needed
+                    "date" to SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()).format(Date()),
+                    "createdAt" to com.google.firebase.Timestamp.now()
+                )
+                
+                userFavRef.set(data)
+                    .addOnSuccessListener {
+                        postRef.get().addOnSuccessListener { postDoc ->
+                            if (postDoc.exists()) {
+                                val currentCount = (postDoc.getLong("favoriteCount") ?: 0L).toInt()
+                                val newCount = currentCount + 1
+                                postRef.update("favoriteCount", newCount)
+                                    .addOnSuccessListener {
+                                        updateFavoriteUI(true)
+                                        Toast.makeText(this, "Added to favorites", Toast.LENGTH_SHORT).show()
+                                        favoriteButton.isEnabled = true
+                                    }
+                                    .addOnFailureListener { exception ->
+                                        Toast.makeText(this, "Failed to update count: ${exception.message}", Toast.LENGTH_SHORT).show()
+                                        favoriteButton.isEnabled = true
+                                    }
+                            } else {
+                                updateFavoriteUI(true)
+                                Toast.makeText(this, "Added to favorites", Toast.LENGTH_SHORT).show()
+                                favoriteButton.isEnabled = true
+                            }
+                        }
+                    }
+                    .addOnFailureListener { exception ->
+                        Toast.makeText(this, "Failed to add favorite: ${exception.message}", Toast.LENGTH_SHORT).show()
+                        favoriteButton.isEnabled = true
+                    }
+            }
+        }.addOnFailureListener { exception ->
+            Toast.makeText(this, "Failed to check favorite status: ${exception.message}", Toast.LENGTH_SHORT).show()
+            favoriteButton.isEnabled = true
         }
     }
-
-    private fun updateFavoriteButton() {
-        if (isFavorite) {
-            favoriteButton.setImageResource(R.drawable.ic_favorite_filled)
-            favoriteButton.setColorFilter(ContextCompat.getColor(this, android.R.color.holo_red_dark))
+    
+    private fun updateFavoriteUI(isFavorited: Boolean) {
+        if (isFavorited) {
+            favoriteButton.setImageResource(R.drawable.ic_favorite_filled_red)
         } else {
             favoriteButton.setImageResource(R.drawable.ic_favorite_border)
-            favoriteButton.setColorFilter(ContextCompat.getColor(this, android.R.color.black))
         }
+    }
+    
+    private fun checkFavoriteStatus() {
+        val uid = auth.currentUser?.uid
+        if (uid == null) {
+            updateFavoriteUI(false)
+            return
+        }
+        
+        if (itemId.isNullOrEmpty()) return
+        
+        firestore.collection("users").document(uid)
+            .collection("favorites").document(itemId!!)
+            .get()
+            .addOnSuccessListener { doc ->
+                val isFavorited = doc.exists()
+                updateFavoriteUI(isFavorited)
+            }
+            .addOnFailureListener {
+                updateFavoriteUI(false)
+            }
+    }
+    
+    private fun loadSellerInfo(sellerId: String, sellerName: String = "") {
+        // Debug logging
+        android.util.Log.d("ViewBiddingActivity", "loadSellerInfo called with sellerId: $sellerId, sellerName: $sellerName")
+        
+        if (sellerId.isEmpty()) {
+            sellerNameText.text = "Seller: Unknown"
+            sellerAvatar.setImageResource(R.drawable.ic_profile)
+            return
+        }
+        
+        // Always try to load the user's profile first for the most up-to-date information
+        android.util.Log.d("ViewBiddingActivity", "Loading seller profile for sellerId: $sellerId")
+        loadSellerProfile(sellerId, sellerName)
+    }
+    
+    private fun loadSellerProfile(sellerId: String, fallbackName: String = "") {
+        firestore.collection("users").document(sellerId)
+            .get()
+            .addOnSuccessListener { document ->
+                if (document.exists()) {
+                    android.util.Log.d("ViewBiddingActivity", "User document found: ${document.data}")
+                    
+                    val username = document.getString("username") ?: 
+                        "${document.getString("firstName") ?: ""} ${document.getString("lastName") ?: ""}".trim()
+                        ?.ifEmpty { document.getString("displayName") ?: "User" }
+                        ?: "User"
+                    
+                    val rating = document.getDouble("rating") ?: 0.0
+                    val totalRatings = document.getLong("totalRatings") ?: 0L
+                    val avatarUrl = document.getString("avatarUrl")
+                    
+                    android.util.Log.d("ViewBiddingActivity", "User data - username: $username, avatarUrl: $avatarUrl, rating: $rating, totalRatings: $totalRatings")
+                    
+                    // Display username with rating (show rating if there are actual ratings)
+                    val displayText = if (totalRatings > 0) {
+                        "Seller: $username (${String.format("%.1f", rating)}★)"
+                    } else {
+                        "Seller: $username"
+                    }
+                    sellerNameText.text = displayText
+                    
+                    // Load profile picture with circular background
+                    if (!avatarUrl.isNullOrEmpty()) {
+                        android.util.Log.d("ViewBiddingActivity", "Loading avatar from URL: $avatarUrl")
+                        Glide.with(this)
+                            .load(avatarUrl)
+                            .circleCrop()
+                            .placeholder(R.drawable.ic_profile)
+                            .error(R.drawable.ic_profile)
+                            .into(sellerAvatar)
+                    } else {
+                        android.util.Log.d("ViewBiddingActivity", "No avatar URL found, using default")
+                        sellerAvatar.setImageResource(R.drawable.ic_profile)
+                    }
+                    
+                    // Set up click listeners to view seller profile
+                    val profileClickListener = View.OnClickListener {
+                        android.util.Log.d("ViewBiddingActivity", "Seller info clicked, navigating to profile for sellerId: $sellerId")
+                        val intent = Intent(this, ViewUserProfileActivity::class.java)
+                        intent.putExtra("sellerId", sellerId)
+                        startActivity(intent)
+                    }
+                    
+                    sellerNameText.setOnClickListener(profileClickListener)
+                    sellerAvatar.setOnClickListener(profileClickListener)
+                } else {
+                    sellerNameText.text = "Seller: Unknown"
+                    sellerAvatar.setImageResource(R.drawable.ic_profile)
+                    
+                    // Set up click listeners even when user document doesn't exist
+                    if (sellerId.isNotEmpty()) {
+                        val profileClickListener = View.OnClickListener {
+                            val intent = Intent(this, ViewUserProfileActivity::class.java)
+                            intent.putExtra("sellerId", sellerId)
+                            startActivity(intent)
+                        }
+                        
+                        sellerNameText.setOnClickListener(profileClickListener)
+                        sellerAvatar.setOnClickListener(profileClickListener)
+                    }
+                }
+            }
+            .addOnFailureListener { exception ->
+                android.util.Log.e("ViewBiddingActivity", "Failed to load seller: ${exception.message}")
+                if (fallbackName.isNotEmpty()) {
+                    sellerNameText.text = "Seller: $fallbackName"
+                } else {
+                    sellerNameText.text = "Seller: Unknown"
+                }
+                sellerAvatar.setImageResource(R.drawable.ic_profile)
+                
+                // Set up click listeners even in fallback case
+                if (sellerId.isNotEmpty()) {
+                    val profileClickListener = View.OnClickListener {
+                        val intent = Intent(this, ViewUserProfileActivity::class.java)
+                        intent.putExtra("sellerId", sellerId)
+                        startActivity(intent)
+                    }
+                    
+                    sellerNameText.setOnClickListener(profileClickListener)
+                    sellerAvatar.setOnClickListener(profileClickListener)
+                }
+            }
+    }
+
+    private fun contactSeller() {
+        val currentUserId = auth.currentUser?.uid
+        if (currentUserId == null) {
+            Toast.makeText(this, "Please log in to contact seller", Toast.LENGTH_SHORT).show()
+            return
+        }
+        
+        if (itemId.isNullOrEmpty()) {
+            Toast.makeText(this, "Item information not available", Toast.LENGTH_SHORT).show()
+            return
+        }
+        
+        // Get post details to find the seller
+        firestore.collection("posts").document(itemId!!)
+            .get()
+            .addOnSuccessListener { postDoc ->
+                if (postDoc.exists()) {
+                    val sellerId = postDoc.getString("userId")
+                    if (sellerId.isNullOrEmpty()) {
+                        Toast.makeText(this, "Seller information not available", Toast.LENGTH_SHORT).show()
+                        return@addOnSuccessListener
+                    }
+                    
+                    // Check if user is trying to contact themselves
+                    if (sellerId == currentUserId) {
+                        contactSellerButton.isEnabled = false
+                        contactSellerButton.alpha = 0.5f
+                        Toast.makeText(this, "You can't message yourself", Toast.LENGTH_SHORT).show()
+                        return@addOnSuccessListener
+                    }
+                    
+                    // Create or find chat with seller
+                    createOrFindChat(sellerId)
+                } else {
+                    Toast.makeText(this, "Item not found", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .addOnFailureListener {
+                Toast.makeText(this, "Failed to load item details", Toast.LENGTH_SHORT).show()
+            }
+    }
+    
+    private fun createOrFindChat(sellerId: String) {
+        val currentUserId = auth.currentUser?.uid ?: return
+        
+        // Check if chat already exists between these users
+        firestore.collection("chats")
+            .whereArrayContains("participants", currentUserId)
+            .get()
+            .addOnSuccessListener { chatsSnapshot ->
+                var existingChatId: String? = null
+                
+                // Look for existing chat with the seller
+                for (chatDoc in chatsSnapshot.documents) {
+                    val participants = chatDoc.get("participants") as? List<String>
+                    if (participants != null && participants.contains(sellerId)) {
+                        existingChatId = chatDoc.id
+                        break
+                    }
+                }
+                
+                if (existingChatId != null) {
+                    // Chat exists, navigate to it
+                    navigateToChat(existingChatId, sellerId)
+                } else {
+                    // Create new chat
+                    createNewChat(sellerId)
+                }
+            }
+            .addOnFailureListener {
+                Toast.makeText(this, "Failed to check existing chats", Toast.LENGTH_SHORT).show()
+            }
+    }
+    
+    private fun createNewChat(sellerId: String) {
+        val currentUserId = auth.currentUser?.uid ?: return
+        
+        // Get seller's information for the chat
+        firestore.collection("users").document(sellerId)
+            .get()
+            .addOnSuccessListener { sellerDoc ->
+                val sellerName = if (sellerDoc.exists()) {
+                    sellerDoc.getString("username") ?: 
+                    "${sellerDoc.getString("firstName") ?: ""} ${sellerDoc.getString("lastName") ?: ""}".trim()
+                        .ifEmpty { sellerDoc.getString("displayName") ?: "User" }
+                } else {
+                    "User"
+                }
+                
+                val sellerAvatar = sellerDoc.getString("avatarUrl")
+                
+                // Create new chat document
+                val chatData = hashMapOf(
+                    "participants" to listOf(currentUserId, sellerId),
+                    "lastMessage" to "",
+                    "lastMessageTime" to System.currentTimeMillis(),
+                    "lastMessageSender" to "",
+                    "createdAt" to com.google.firebase.Timestamp.now(),
+                    "unreadCount_$currentUserId" to 0,
+                    "unreadCount_$sellerId" to 0
+                )
+                
+                firestore.collection("chats")
+                    .add(chatData)
+                    .addOnSuccessListener { chatDoc ->
+                        navigateToChat(chatDoc.id, sellerId, sellerName, sellerAvatar)
+                    }
+                    .addOnFailureListener {
+                        Toast.makeText(this, "Failed to create chat", Toast.LENGTH_SHORT).show()
+                    }
+            }
+            .addOnFailureListener {
+                // Create chat with minimal info if seller data can't be loaded
+                val chatData = hashMapOf(
+                    "participants" to listOf(currentUserId, sellerId),
+                    "lastMessage" to "",
+                    "lastMessageTime" to System.currentTimeMillis(),
+                    "lastMessageSender" to "",
+                    "createdAt" to com.google.firebase.Timestamp.now(),
+                    "unreadCount_$currentUserId" to 0,
+                    "unreadCount_$sellerId" to 0
+                )
+                
+                firestore.collection("chats")
+                    .add(chatData)
+                    .addOnSuccessListener { chatDoc ->
+                        navigateToChat(chatDoc.id, sellerId)
+                    }
+                    .addOnFailureListener {
+                        Toast.makeText(this, "Failed to create chat", Toast.LENGTH_SHORT).show()
+                    }
+            }
+    }
+    
+    private fun navigateToChat(chatId: String, sellerId: String, sellerName: String = "", sellerAvatar: String? = null) {
+        val intent = Intent(this, ChatRoomActivity::class.java)
+        intent.putExtra("chatId", chatId)
+        intent.putExtra("otherUserId", sellerId)
+        intent.putExtra("otherUserName", sellerName)
+        intent.putExtra("otherUserAvatar", sellerAvatar)
+        startActivity(intent)
+    }
+
+    private fun formatPrice(price: String): String {
+        if (price.startsWith("₱") || price.startsWith("PHP")) {
+            return price
+        }
+        return "₱$price"
     }
 
     override fun onDestroy() {

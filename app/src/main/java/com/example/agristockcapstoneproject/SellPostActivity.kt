@@ -205,26 +205,43 @@ class SellPostActivity : AppCompatActivity() {
 
     private fun uploadImageToStorage(uri: Uri, callback: (String?) -> Unit) {
         val user = auth.currentUser ?: run {
+            showError("You must be logged in to upload images")
+            callback(null)
+            return
+        }
+
+        // Ensure user is authenticated before uploading
+        if (user.uid.isBlank()) {
+            showError("Invalid user authentication")
             callback(null)
             return
         }
 
         val timestamp = System.currentTimeMillis()
         val imageRef = storage.reference.child("post_images/${user.uid}_${timestamp}.jpg")
-        imageRef.putFile(uri)
-                .continueWithTask { task ->
-                    if (!task.isSuccessful) {
-                        throw task.exception ?: RuntimeException("Upload failed")
+
+        // Add metadata to the upload
+        val metadata = com.google.firebase.storage.StorageMetadata.Builder()
+            .setContentType("image/jpeg")
+            .setCustomMetadata("userId", user.uid)
+            .setCustomMetadata("uploadTime", timestamp.toString())
+            .build()
+
+        imageRef.putFile(uri, metadata)
+            .addOnSuccessListener { taskSnapshot ->
+                imageRef.downloadUrl
+                    .addOnSuccessListener { downloadUri ->
+                        callback(downloadUri.toString())
                     }
-                    imageRef.downloadUrl
-                }
-                .addOnSuccessListener { downloadUri ->
-                    callback(downloadUri.toString())
-                }
-                .addOnFailureListener { exception ->
-                    showError("Upload failed: ${exception.message}")
-                    callback(null)
-                }
+                    .addOnFailureListener { exception ->
+                        showError("Failed to get image URL: ${exception.message}")
+                        callback(null)
+                    }
+            }
+            .addOnFailureListener { exception ->
+                showError("Upload failed: ${exception.message}")
+                callback(null)
+            }
     }
 
     private fun uploadAllImagesThenPost() {
@@ -264,30 +281,72 @@ class SellPostActivity : AppCompatActivity() {
         val timestamp = System.currentTimeMillis()
         val datePosted = LocalDateTime.now().format(DateTimeFormatter.ofPattern("MMM dd, yyyy"))
 
-        val postData = hashMapOf(
-            "userId" to user.uid,
-            "type" to "SELL",
-            "title" to title,
-            "price" to price,
-            "description" to description,
-            "category" to category,
-            "imageUrls" to uploadedImageUrls,
-            "timestamp" to timestamp,
-            "datePosted" to datePosted,
-            "status" to "Available",
-            "sellerName" to (user.displayName ?: "Unknown Seller"),
-            "location" to "Manila" // You can add location picker later
-        )
+        // Get seller name from user profile
+        firestore.collection("users").document(user.uid).get()
+            .addOnSuccessListener { userDoc ->
+                val sellerName = userDoc.getString("username") ?: 
+                    "${userDoc.getString("firstName") ?: ""} ${userDoc.getString("lastName") ?: ""}".trim()
+                    ?.ifEmpty { userDoc.getString("displayName") ?: user.displayName ?: "User" }
+                    ?: (user.displayName ?: "User")
+                
+                val postData = hashMapOf(
+                    "userId" to user.uid,
+                    "type" to "SELL",
+                    "title" to title,
+                    "price" to price,
+                    "description" to description,
+                    "category" to category,
+                    "imageUrls" to uploadedImageUrls,
+                    "imageUrl" to uploadedImageUrls.firstOrNull(), // Store first image for compatibility
+                    "timestamp" to timestamp,
+                    "datePosted" to datePosted,
+                    "status" to "Available",
+                    "sellerName" to sellerName,
+                    "location" to "Manila", // You can add location picker later
+                    "favoriteCount" to 0L // Initialize favorite count
+                )
 
-        firestore.collection("posts")
-            .add(postData)
-            .addOnSuccessListener { documentReference ->
-                showSuccessDialog()
+                firestore.collection("posts")
+                    .add(postData)
+                    .addOnSuccessListener { documentReference ->
+                        showSuccessDialog()
+                    }
+                    .addOnFailureListener { exception ->
+                        showError("Failed to post: ${exception.message}")
+                        postButton.isEnabled = true
+                        postButton.text = "POST"
+                    }
             }
             .addOnFailureListener { exception ->
-                showError("Failed to post: ${exception.message}")
-                postButton.isEnabled = true
-                postButton.text = "POST"
+                // Fallback to displayName if user profile can't be loaded
+                val fallbackName = user.displayName ?: "User"
+                val postData = hashMapOf(
+                    "userId" to user.uid,
+                    "type" to "SELL",
+                    "title" to title,
+                    "price" to price,
+                    "description" to description,
+                    "category" to category,
+                    "imageUrls" to uploadedImageUrls,
+                    "imageUrl" to uploadedImageUrls.firstOrNull(),
+                    "timestamp" to timestamp,
+                    "datePosted" to datePosted,
+                    "status" to "Available",
+                    "sellerName" to fallbackName,
+                    "location" to "Manila",
+                    "favoriteCount" to 0L
+                )
+
+                firestore.collection("posts")
+                    .add(postData)
+                    .addOnSuccessListener { documentReference ->
+                        showSuccessDialog()
+                    }
+                    .addOnFailureListener { exception ->
+                        showError("Failed to post: ${exception.message}")
+                        postButton.isEnabled = true
+                        postButton.text = "POST"
+                    }
             }
     }
 

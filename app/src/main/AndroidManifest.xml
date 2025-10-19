@@ -59,13 +59,19 @@
 
         <!-- Notifications Activity -->
         <activity
-            android:name=".NotificationActivity"
+            android:name=".NotificationsActivity"
             android:exported="false"
             android:theme="@style/Theme.AgristockCapstoneProject" />
 
         <!-- Profile Activity -->
         <activity
             android:name=".ProfileActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AgristockCapstoneProject" />
+
+        <!-- View User Profile Activity -->
+        <activity
+            android:name=".ViewUserProfileActivity"
             android:exported="false"
             android:theme="@style/Theme.AgristockCapstoneProject" />
 
@@ -144,6 +150,18 @@
         <!-- Bid Post Activity -->
         <activity
             android:name=".BidPostActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AgristockCapstoneProject" />
+
+        <!-- Messages Activity -->
+        <activity
+            android:name=".MessagesActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AgristockCapstoneProject" />
+
+        <!-- Chat Room Activity -->
+        <activity
+            android:name=".ChatRoomActivity"
             android:exported="false"
             android:theme="@style/Theme.AgristockCapstoneProject" />
 

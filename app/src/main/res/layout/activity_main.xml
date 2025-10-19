@@ -21,7 +21,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:background="@color/white"
+            android:background="#FFD700"
             android:padding="12dp"
             android:elevation="4dp"
             android:fitsSystemWindows="true">
@@ -52,24 +52,31 @@
                     android:layout_weight="1"
                     android:layout_marginStart="8dp"
                     android:text="AgriStock"
-                    android:textColor="@color/text_primary"
+                    android:textColor="#000000"
                     android:textSize="24sp"
                     android:textStyle="bold"
                     android:fontFamily="sans-serif-medium" />
 
             </LinearLayout>
 
-            <!-- Search Bar -->
-            <com.google.android.material.textfield.TextInputLayout
+            <!-- Search Bar with Search Button -->
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="8dp"
+                android:orientation="horizontal"
+                android:layout_marginBottom="8dp">
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="8dp"
                 app:boxBackgroundMode="outline"
                 app:boxCornerRadiusTopStart="8dp"
                 app:boxCornerRadiusTopEnd="8dp"
                 app:boxCornerRadiusBottomStart="8dp"
                 app:boxCornerRadiusBottomEnd="8dp"
-                app:boxBackgroundColor="@color/white"
+                    app:boxBackgroundColor="#FFFFFF"
                 app:boxStrokeColor="@color/gray_200"
                 app:hintTextColor="@color/text_hint"
                 app:startIconDrawable="@drawable/ic_search"
@@ -88,81 +95,21 @@
 
             </com.google.android.material.textfield.TextInputLayout>
 
-            <!-- Category Chips -->
-            <HorizontalScrollView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="8dp"
-                android:scrollbars="none">
-
-                <LinearLayout
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="CARABAO"
-                        android:background="@drawable/category_chip_default"
-                        android:paddingHorizontal="12dp"
-                        android:paddingVertical="6dp"
-                        android:layout_marginEnd="6dp"
-                        android:textSize="12sp"
-                        android:textColor="@color/text_secondary"
-                        android:fontFamily="sans-serif-medium" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="CHICKEN"
-                        android:background="@drawable/category_chip_default"
-                        android:paddingHorizontal="12dp"
-                        android:paddingVertical="6dp"
-                        android:layout_marginEnd="6dp"
-                        android:textSize="12sp"
-                        android:textColor="@color/text_secondary"
-                        android:fontFamily="sans-serif-medium" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="GOAT"
-                        android:background="@drawable/category_chip_default"
-                        android:paddingHorizontal="12dp"
-                        android:paddingVertical="6dp"
-                        android:layout_marginEnd="6dp"
-                        android:textSize="12sp"
-                        android:textColor="@color/text_secondary"
-                        android:fontFamily="sans-serif-medium" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="COW"
-                        android:background="@drawable/category_chip_default"
-                        android:paddingHorizontal="12dp"
-                        android:paddingVertical="6dp"
-                        android:layout_marginEnd="6dp"
-                        android:textSize="12sp"
-                        android:textColor="@color/text_secondary"
-                        android:fontFamily="sans-serif-medium" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="PIG"
-                        android:background="@drawable/category_chip_default"
-                        android:paddingHorizontal="12dp"
-                        android:paddingVertical="6dp"
-                        android:layout_marginEnd="6dp"
-                        android:textSize="12sp"
-                        android:textColor="@color/text_secondary"
-                        android:fontFamily="sans-serif-medium" />
+                <!-- Search Icon Button -->
+                <ImageView
+                    android:id="@+id/btn_search_icon"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:src="@drawable/ic_search"
+                    android:background="@drawable/button_search_icon"
+                    android:padding="12dp"
+                    android:contentDescription="Search"
+                    android:clickable="true"
+                    android:focusable="true" />
 
                 </LinearLayout>
 
-            </HorizontalScrollView>
+            <!-- Category chips removed for cleaner header -->
 
             <!-- SELL and BID Buttons -->
             <LinearLayout
@@ -272,26 +219,81 @@
 
             <!-- Bottom Navigation Bar (Floating) -->
 
-            <ScrollView
+            <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+                android:id="@+id/srl_home_refresh"
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
-                android:layout_weight="1"
-                android:background="@color/background_secondary"
-                android:padding="12dp"
-                android:fillViewport="true">
+                android:layout_weight="1">
 
-                <LinearLayout
-                    android:id="@+id/ll_posts_container"
+                <ScrollView
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical">
+                    android:layout_height="match_parent"
+                    android:background="@color/background_secondary"
+                    android:padding="12dp"
+                    android:fillViewport="true">
 
-                    <!-- Posts will be added dynamically here -->
-                    <!-- Empty state will be shown when no posts -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical">
 
-                </LinearLayout>
+                        <!-- View Toggle Options -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="end"
+                            android:layout_marginBottom="12dp">
 
-            </ScrollView>
+                            <LinearLayout
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:orientation="horizontal"
+                                android:background="@drawable/view_toggle_background"
+                                android:padding="2dp">
+
+                                <ImageView
+                                    android:id="@+id/btn_list_view_home"
+                                    android:layout_width="32dp"
+                                    android:layout_height="32dp"
+                                    android:background="@drawable/view_toggle_active"
+                                    android:src="@drawable/ic_list_view"
+                                    android:padding="6dp"
+                                    android:clickable="true"
+                                    android:focusable="true"
+                                    android:contentDescription="List View" />
+
+                                <ImageView
+                                    android:id="@+id/btn_grid_view_home"
+                                    android:layout_width="32dp"
+                                    android:layout_height="32dp"
+                                    android:layout_marginStart="2dp"
+                                    android:background="@drawable/view_toggle_inactive"
+                                    android:src="@drawable/ic_grid_view"
+                                    android:padding="6dp"
+                                    android:clickable="true"
+                                    android:focusable="true"
+                                    android:contentDescription="Grid View" />
+
+                            </LinearLayout>
+
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:id="@+id/ll_posts_container"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical">
+
+                            <!-- Posts will be added dynamically here -->
+                            <!-- Empty state will be shown when no posts -->
+
+                        </LinearLayout>
+
+                    </LinearLayout>
+
+                </ScrollView>
+            </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
             <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
@@ -351,12 +353,30 @@
                     android:background="@drawable/ripple_nav_item"
                     android:padding="6dp">
 
-                    <ImageView
-                        android:layout_width="36dp"
-                        android:layout_height="36dp"
-                        android:padding="4dp"
-                        android:src="@drawable/ic_notifications"
-                        android:tint="@color/text_secondary" />
+                    <FrameLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content">
+
+                        <ImageView
+                            android:id="@+id/iv_notifications_icon"
+                            android:layout_width="36dp"
+                            android:layout_height="36dp"
+                            android:padding="4dp"
+                            android:src="@drawable/ic_notifications"
+                            android:tint="@color/text_secondary" />
+
+                        <!-- Notification Badge -->
+                        <View
+                            android:id="@+id/badge_notifications"
+                            android:layout_width="8dp"
+                            android:layout_height="8dp"
+                            android:layout_gravity="top|end"
+                            android:layout_marginTop="2dp"
+                            android:layout_marginEnd="2dp"
+                            android:background="@drawable/unread_dot_background"
+                            android:visibility="gone" />
+
+                    </FrameLayout>
 
                     <TextView
                         android:layout_width="wrap_content"

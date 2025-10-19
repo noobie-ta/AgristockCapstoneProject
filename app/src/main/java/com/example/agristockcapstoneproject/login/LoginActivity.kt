@@ -77,45 +77,25 @@ class LoginActivity : AppCompatActivity() {
         binding.btnLogin.isEnabled = false
         binding.btnLogin.text = "Signing in..."
 
-        // First check if account exists in Firestore
-        firestore.collection("users").whereEqualTo("email", email).limit(1).get()
-            .addOnSuccessListener { query ->
-                if (query.isEmpty) {
-                    binding.btnLogin.isEnabled = true
-                    binding.btnLogin.text = "Log In"
-                    Toast.makeText(this, "Account does not exist", Toast.LENGTH_LONG).show()
-                } else {
-                    // Proceed with Firebase Auth sign-in
-                    auth.signInWithEmailAndPassword(email, password)
-                        .addOnCompleteListener(this) { task ->
-                            binding.btnLogin.isEnabled = true
-                            binding.btnLogin.text = "Log In"
-
-                            if (task.isSuccessful) {
-                                Log.d("LoginActivity", "signInWithEmail:success")
-                                val user = auth.currentUser
-                                if (user != null) {
-                                    navigateToMain()
-                                } else {
-                                    Toast.makeText(this, "Authentication failed", Toast.LENGTH_LONG).show()
-                                }
-                            } else {
-                                val ex = task.exception
-                                Log.w("LoginActivity", "signInWithEmail:failure", ex)
-                                val message = when (ex?.javaClass?.simpleName) {
-                                    "FirebaseAuthInvalidCredentialsException" -> "Incorrect email or password"
-                                    "FirebaseAuthInvalidUserException" -> "Account does not exist"
-                                    else -> ex?.message ?: "Authentication failed"
-                                }
-                                Toast.makeText(this, message, Toast.LENGTH_LONG).show()
-                            }
-                        }
-                }
-            }
-            .addOnFailureListener {
+        // Sign in first; then check/create user profile in Firestore
+        auth.signInWithEmailAndPassword(email, password)
+            .addOnCompleteListener(this) { task ->
                 binding.btnLogin.isEnabled = true
                 binding.btnLogin.text = "Log In"
-                Toast.makeText(this, "Unable to check account. Try again.", Toast.LENGTH_LONG).show()
+
+                if (task.isSuccessful) {
+                    Log.d("LoginActivity", "signInWithEmail:success")
+                    ensureUserDocumentAndNavigate()
+                } else {
+                    val ex = task.exception
+                    Log.w("LoginActivity", "signInWithEmail:failure", ex)
+                    val message = when (ex?.javaClass?.simpleName) {
+                        "FirebaseAuthInvalidCredentialsException" -> "Incorrect email or password"
+                        "FirebaseAuthInvalidUserException" -> "Account does not exist"
+                        else -> ex?.message ?: "Authentication failed"
+                    }
+                    Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+                }
             }
     }
 

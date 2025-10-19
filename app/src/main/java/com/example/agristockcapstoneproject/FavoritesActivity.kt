@@ -1,5 +1,6 @@
 package com.example.agristockcapstoneproject
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -22,7 +23,8 @@ class FavoritesActivity : AppCompatActivity() {
         val title: String,
         val price: String,
         val imageUrl: String?,
-        val date: String
+        val date: String,
+        val type: String = "SELL" // SELL or BID
     )
 
     private lateinit var recyclerView: RecyclerView
@@ -32,6 +34,8 @@ class FavoritesActivity : AppCompatActivity() {
 
     private val auth: FirebaseAuth by lazy { FirebaseAuth.getInstance() }
     private val firestore: FirebaseFirestore by lazy { FirebaseFirestore.getInstance() }
+    private var favoritesListener: com.google.firebase.firestore.ListenerRegistration? = null
+    private val removingItems = mutableSetOf<String>() // Track items being removed to prevent duplicates
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -55,6 +59,23 @@ class FavoritesActivity : AppCompatActivity() {
         loadFavorites()
     }
 
+    override fun onResume() {
+        super.onResume()
+        loadFavorites()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        // Set up real-time listener for favorites changes
+        setupFavoritesListener()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // Remove listener to save resources
+        removeFavoritesListener()
+    }
+
     private fun loadFavorites() {
         val uid = auth.currentUser?.uid ?: run {
             showEmpty()
@@ -67,18 +88,41 @@ class FavoritesActivity : AppCompatActivity() {
             .addOnSuccessListener { qs ->
                 items.clear()
                 for (doc in qs.documents) {
-                    items.add(
-                        FavoriteItem(
-                            id = doc.getString("postId") ?: doc.id,
-                            title = doc.getString("title") ?: "",
-                            price = doc.getString("price") ?: "",
-                            imageUrl = doc.getString("imageUrl"),
-                            date = doc.getString("date") ?: ""
-                        )
-                    )
+                    val postId = doc.getString("postId") ?: doc.id
+                    // Fetch post type from the original post document
+                    firestore.collection("posts").document(postId)
+                        .get()
+                        .addOnSuccessListener { postDoc ->
+                            val postType = postDoc.getString("type") ?: "SELL"
+                            items.add(
+                                FavoriteItem(
+                                    id = postId,
+                                    title = doc.getString("title") ?: "",
+                                    price = doc.getString("price") ?: "",
+                                    imageUrl = doc.getString("imageUrl"),
+                                    date = doc.getString("date") ?: "",
+                                    type = postType
+                                )
+                            )
+                            recyclerView.adapter?.notifyDataSetChanged()
+                            if (items.isEmpty()) showEmpty() else showList()
+                        }
+                        .addOnFailureListener {
+                            // If we can't get the post type, default to SELL
+                            items.add(
+                                FavoriteItem(
+                                    id = postId,
+                                    title = doc.getString("title") ?: "",
+                                    price = doc.getString("price") ?: "",
+                                    imageUrl = doc.getString("imageUrl"),
+                                    date = doc.getString("date") ?: "",
+                                    type = "SELL"
+                                )
+                            )
+                            recyclerView.adapter?.notifyDataSetChanged()
+                            if (items.isEmpty()) showEmpty() else showList()
+                        }
                 }
-                recyclerView.adapter?.notifyDataSetChanged()
-                if (items.isEmpty()) showEmpty() else showList()
             }
             .addOnFailureListener {
                 showEmpty()
@@ -108,18 +152,79 @@ class FavoritesActivity : AppCompatActivity() {
 
     private fun removeFavorite(item: FavoriteItem) {
         val uid = auth.currentUser?.uid ?: return
-        // Smooth animation: notify removal after deleting
+        
+        // Prevent duplicate removal attempts
+        if (removingItems.contains(item.id)) {
+            return
+        }
+        removingItems.add(item.id)
+        
+        // Get the index before deletion for proper animation
         val index = items.indexOfFirst { it.id == item.id }
+        
+        // Delete from user's favorites
         firestore.collection("users").document(uid)
             .collection("favorites").document(item.id)
             .delete()
             .addOnSuccessListener {
-                if (index != -1) {
-                    items.removeAt(index)
-                    recyclerView.adapter?.notifyItemRemoved(index)
-                }
-                if (items.isEmpty()) showEmpty()
+                // Update the post's favorite count with better error handling
+                firestore.collection("posts").document(item.id)
+                    .get()
+                    .addOnSuccessListener { postDoc ->
+                        if (postDoc.exists()) {
+                            val currentCount = (postDoc.getLong("favoriteCount") ?: 0L).toInt()
+                            val newCount = maxOf(0, currentCount - 1) // Prevent negative counts
+                            
+                            firestore.collection("posts").document(item.id)
+                                .update("favoriteCount", newCount)
+                                .addOnSuccessListener {
+                                    // Update UI after successful database operations
+                                    updateUIAfterRemoval(index)
+                                }
+                                .addOnFailureListener { exception ->
+                                    // Handle post update failure
+                                    android.widget.Toast.makeText(this, "Failed to update post count: ${exception.message}", android.widget.Toast.LENGTH_SHORT).show()
+                                    // Still remove from UI since favorite was deleted
+                                    updateUIAfterRemoval(index)
+                                }
+                        } else {
+                            // Post doesn't exist, just update UI
+                            updateUIAfterRemoval(index)
+                        }
+                    }
+                    .addOnFailureListener { exception ->
+                        // Handle post fetch failure
+                        android.widget.Toast.makeText(this, "Failed to fetch post: ${exception.message}", android.widget.Toast.LENGTH_SHORT).show()
+                        // Still remove from UI since favorite was deleted
+                        updateUIAfterRemoval(index)
+                    }
             }
+            .addOnFailureListener { exception ->
+                // Handle favorite deletion failure
+                android.widget.Toast.makeText(this, "Failed to remove favorite: ${exception.message}", android.widget.Toast.LENGTH_SHORT).show()
+                // Clear the removing item from tracking
+                removingItems.remove(item.id)
+            }
+    }
+    
+    private fun updateUIAfterRemoval(index: Int) {
+        try {
+            if (index != -1 && index < items.size) {
+                val removedItem = items.removeAt(index)
+                // Remove from tracking set
+                removingItems.remove(removedItem.id)
+                // Notify adapter of the change
+                recyclerView.adapter?.notifyItemRemoved(index)
+                // Also notify that the data set has changed to ensure consistency
+                recyclerView.adapter?.notifyDataSetChanged()
+            }
+            if (items.isEmpty()) showEmpty()
+        } catch (e: Exception) {
+            // Handle UI update errors
+            android.widget.Toast.makeText(this, "Error updating UI: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+            // Force refresh the entire list
+            loadFavorites()
+        }
     }
 
     private inner class FavoritesAdapter(
@@ -144,14 +249,84 @@ class FavoritesActivity : AppCompatActivity() {
             val item = data[position]
             holder.title.text = item.title
             holder.price.text = item.price
-            holder.date.text = item.date
+            holder.date.text = "Added ${item.date}"
             if (!item.imageUrl.isNullOrEmpty()) {
-                Glide.with(this@FavoritesActivity).load(item.imageUrl).into(holder.image)
+                Glide.with(this@FavoritesActivity)
+                    .load(item.imageUrl)
+                    .centerCrop()
+                    .placeholder(R.drawable.ic_image_placeholder)
+                    .error(R.drawable.ic_image_placeholder)
+                    .into(holder.image)
+            } else {
+                holder.image.setImageResource(R.drawable.ic_image_placeholder)
             }
-            holder.btn.setOnClickListener { onUnfavorite(item) }
+            
+            // Set up click listeners
+            holder.btn.setOnClickListener { view ->
+                // Add click animation
+                animateCard(view)
+                onUnfavorite(item)
+            }
+            
+            // Make the entire card clickable to view item details
+            holder.itemView.setOnClickListener { view ->
+                // Add click animation
+                animateCard(view)
+                // Navigate to appropriate activity based on post type
+                val intent = if (item.type == "BID") {
+                    Intent(this@FavoritesActivity, ViewBiddingActivity::class.java)
+                } else {
+                    Intent(this@FavoritesActivity, ItemDetailsActivity::class.java)
+                }
+                intent.putExtra("postId", item.id)
+                this@FavoritesActivity.startActivity(intent)
+            }
         }
 
         override fun getItemCount(): Int = data.size
+    }
+
+    private fun setupFavoritesListener() {
+        val uid = auth.currentUser?.uid ?: return
+        
+        favoritesListener = firestore.collection("users").document(uid)
+            .collection("favorites")
+            .orderBy("createdAt")
+            .addSnapshotListener { snapshot, exception ->
+                if (exception != null) {
+                    showEmpty()
+                    return@addSnapshotListener
+                }
+                
+                items.clear()
+                snapshot?.documents?.forEach { doc ->
+                    items.add(
+                        FavoriteItem(
+                            id = doc.getString("postId") ?: doc.id,
+                            title = doc.getString("title") ?: "",
+                            price = doc.getString("price") ?: "",
+                            imageUrl = doc.getString("imageUrl"),
+                            date = doc.getString("date") ?: ""
+                        )
+                    )
+                }
+                recyclerView.adapter?.notifyDataSetChanged()
+                if (items.isEmpty()) showEmpty() else showList()
+            }
+    }
+
+    private fun removeFavoritesListener() {
+        favoritesListener?.remove()
+        favoritesListener = null
+    }
+    
+    private fun animateCard(view: View) {
+        val scaleX = android.animation.ObjectAnimator.ofFloat(view, "scaleX", 1f, 0.95f, 1f)
+        val scaleY = android.animation.ObjectAnimator.ofFloat(view, "scaleY", 1f, 0.95f, 1f)
+        scaleX.duration = 150
+        scaleY.duration = 150
+        scaleX.start()
+        scaleY.start()
     }
 }
 

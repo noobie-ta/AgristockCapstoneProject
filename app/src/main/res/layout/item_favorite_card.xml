@@ -2,58 +2,104 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="horizontal"
-    android:background="@drawable/white_card_round"
-    android:padding="12dp"
-    android:layout_marginBottom="12dp">
+    android:orientation="vertical"
+    android:background="@drawable/modern_post_card_background"
+    android:padding="16dp"
+    android:layout_marginBottom="16dp"
+    android:elevation="4dp"
+    android:clickable="true"
+    android:focusable="true"
+    android:foreground="?attr/selectableItemBackground">
 
-    <ImageView
-        android:id="@+id/iv_item_image"
-        android:layout_width="72dp"
-        android:layout_height="72dp"
-        android:scaleType="centerCrop"
-        android:background="#EEEEEE" />
-
+    <!-- Header with image and basic info -->
     <LinearLayout
-        android:layout_width="0dp"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:layout_marginStart="12dp"
-        android:orientation="vertical">
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
 
-        <TextView
-            android:id="@+id/tv_item_name"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Item Name"
-            android:textColor="#000000"
-            android:textStyle="bold"
-            android:textSize="16sp" />
+        <ImageView
+            android:id="@+id/iv_item_image"
+            android:layout_width="80dp"
+            android:layout_height="80dp"
+            android:scaleType="centerCrop"
+            android:background="@color/gray_100"
+            android:layout_marginEnd="16dp" />
 
-        <TextView
-            android:id="@+id/tv_item_price"
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="₱0.00"
-            android:textColor="#444444" />
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tv_item_name"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Item Name"
+                android:textColor="@color/text_primary"
+                android:textStyle="bold"
+                android:textSize="18sp"
+                android:fontFamily="sans-serif-medium"
+                android:maxLines="2"
+                android:ellipsize="end" />
+
+            <TextView
+                android:id="@+id/tv_item_price"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="₱0.00"
+                android:textColor="@color/yellow_accent"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:fontFamily="sans-serif-medium" />
+
+        </LinearLayout>
+
+        <!-- Unfavorite button -->
+        <ImageView
+            android:id="@+id/btn_unfavorite"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:src="@drawable/ic_favorite_filled_red"
+            android:background="@drawable/menu_button_background"
+            android:padding="6dp"
+            android:contentDescription="Remove from favorites"
+            android:clickable="true"
+            android:focusable="true" />
+
+    </LinearLayout>
+
+    <!-- Footer with date and status -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="12dp"
+        android:gravity="center_vertical">
 
         <TextView
             android:id="@+id/tv_date"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Added Sep 01, 2025"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp"
+            android:fontFamily="sans-serif" />
+
+        <!-- View item indicator -->
+        <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:text="Sep 01, 2025"
-            android:textColor="#777777"
-            android:textSize="12sp" />
-    </LinearLayout>
+            android:text="Tap to view →"
+            android:textColor="@color/yellow_accent"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:fontFamily="sans-serif-medium" />
 
-    <ImageView
-        android:id="@+id/btn_unfavorite"
-        android:layout_width="24dp"
-        android:layout_height="24dp"
-        android:src="@drawable/ic_favorite_filled_red"
-        android:contentDescription="Remove from favorites" />
+    </LinearLayout>
 
 </LinearLayout>
 

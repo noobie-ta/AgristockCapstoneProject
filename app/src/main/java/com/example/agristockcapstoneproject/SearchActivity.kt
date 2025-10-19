@@ -24,15 +24,18 @@ class SearchActivity : AppCompatActivity() {
         val location: String,
         val imageUrl: String?,
         val status: String,
-        val category: String
+        val category: String,
+        val type: String = "SELL" // SELL or BID
     )
 
     private lateinit var searchEditText: EditText
     private lateinit var searchButton: com.google.android.material.button.MaterialButton
     private lateinit var backButton: ImageView
+    private lateinit var menuButton: ImageView
     private lateinit var micButton: ImageView
-    private lateinit var filterButton: ImageView
     private lateinit var recentSearchesContainer: ScrollView
+    private lateinit var recentSearchesContainerInner: LinearLayout
+    private lateinit var clearAllButton: TextView
     private lateinit var resultsRecyclerView: RecyclerView
     private lateinit var emptyStateView: LinearLayout
     private lateinit var resultsContainer: LinearLayout
@@ -75,9 +78,11 @@ class SearchActivity : AppCompatActivity() {
             searchEditText = findViewById(R.id.et_search)
             searchButton = findViewById(R.id.btn_search)
             backButton = findViewById(R.id.btn_back)
+            // menuButton removed from layout
             micButton = findViewById(R.id.btn_mic)
-            filterButton = findViewById(R.id.btn_filter)
             recentSearchesContainer = findViewById(R.id.ll_recent_searches)
+            recentSearchesContainerInner = findViewById(R.id.ll_recent_searches_container)
+            clearAllButton = findViewById(R.id.btn_clear_all)
             resultsRecyclerView = findViewById(R.id.rv_search_results)
             emptyStateView = findViewById(R.id.ll_empty_state)
             resultsContainer = findViewById(R.id.ll_results_container)
@@ -87,18 +92,21 @@ class SearchActivity : AppCompatActivity() {
             // Setup RecyclerView
             resultsRecyclerView.layoutManager = LinearLayoutManager(this)
             resultsRecyclerView.adapter = SearchResultsAdapter(searchResults) { item ->
-                val intent = android.content.Intent(this, ItemDetailsActivity::class.java)
+                val intent = if (item.type == "BID") {
+                    android.content.Intent(this, ViewBiddingActivity::class.java)
+                } else {
+                    android.content.Intent(this, ItemDetailsActivity::class.java)
+                }
                 intent.putExtra("postId", item.id)
                 startActivity(intent)
             }
             
-            // Setup search input listener for Enter key
+            // Setup search input listener for Done key (no auto-search)
             searchEditText.setOnEditorActionListener { _, actionId, _ ->
-                if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH) {
-                    val query = searchEditText.text.toString().trim()
-                    if (query.isNotEmpty()) {
-                        performSearch(query)
-                    }
+                if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_DONE) {
+                    // Just hide keyboard, don't search
+                    val imm = getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+                    imm.hideSoftInputFromWindow(searchEditText.windowToken, 0)
                     true
                 } else {
                     false
@@ -122,14 +130,17 @@ class SearchActivity : AppCompatActivity() {
                 }
             }
             
+            // Menu button removed from layout - no click listener needed
+            
             micButton.setOnClickListener {
                 // Handle voice search
                 Toast.makeText(this, "Voice search coming soon!", Toast.LENGTH_SHORT).show()
             }
             
-            filterButton.setOnClickListener {
-                showFilterDialog()
+            clearAllButton.setOnClickListener {
+                clearAllRecentSearches()
             }
+            
         } catch (e: Exception) {
             Toast.makeText(this, "Error setting up click listeners: ${e.message}", Toast.LENGTH_LONG).show()
         }
@@ -138,25 +149,17 @@ class SearchActivity : AppCompatActivity() {
 
     private fun performSearch(query: String) {
         // Add to recent searches
-        if (!recentSearches.contains(query)) {
-            recentSearches.add(0, query)
-            if (recentSearches.size > 5) {
-                recentSearches.removeAt(recentSearches.size - 1)
-            }
-            saveRecentSearches()
-        }
+        addToRecentSearches(query)
 
         // Show loading state with smooth transition
         showLoadingState()
 
         // Try Firebase first, but fallback to empty if it fails
         try {
-            // Prefix search by title
+            // Get all posts and filter client-side for better search results
             firestore.collection("posts")
-                .orderBy("title")
-                .startAt(query)
-                .endAt(query + "\uf8ff")
-                .limit(20)
+                .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
+                .limit(50)
                 .get()
                 .addOnSuccessListener { documents ->
                     val mapped = documents.map { doc ->
@@ -164,17 +167,30 @@ class SearchActivity : AppCompatActivity() {
                             id = doc.id,
                             name = doc.getString("title") ?: "",
                             price = doc.getString("price") ?: "",
-                            seller = doc.getString("sellerName") ?: "Unknown",
+                            seller = doc.getString("sellerName") ?: "",
                             location = doc.getString("location") ?: "",
                             imageUrl = doc.getString("imageUrl"),
                             status = doc.getString("status") ?: "FOR SALE",
-                            category = doc.getString("category") ?: "OTHER"
+                            category = doc.getString("category") ?: "OTHER",
+                            type = doc.getString("type") ?: "SELL"
                         )
                     }
 
-                    // Client-side filters
-                    val notSold = mapped.filter { it.status.uppercase() != "SOLD" }
-                    val byCategory = if (currentCategory == "ALL") notSold else notSold.filter { it.category.equals(currentCategory, true) }
+                    // Client-side search filtering
+                    val searchResults = mapped.filter { item ->
+                        // Search in title, description, category, and seller name
+                        val searchText = query.lowercase()
+                        val titleMatch = item.name.lowercase().contains(searchText)
+                        val categoryMatch = item.category.lowercase().contains(searchText)
+                        val sellerMatch = item.seller.lowercase().contains(searchText)
+                        val locationMatch = item.location.lowercase().contains(searchText)
+                        
+                        (titleMatch || categoryMatch || sellerMatch || locationMatch) &&
+                        item.status.uppercase() != "SOLD"
+                    }
+
+                    // Apply additional filters
+                    val byCategory = if (currentCategory == "ALL") searchResults else searchResults.filter { it.category.equals(currentCategory, true) }
                     val byPrice = byCategory.filter { item ->
                         val numeric = item.price.filter { ch -> ch.isDigit() }
                         val value = numeric.toIntOrNull() ?: Int.MAX_VALUE
@@ -186,11 +202,13 @@ class SearchActivity : AppCompatActivity() {
 
                     updateSearchResults(byLocation)
                 }
-                .addOnFailureListener { _ ->
+                .addOnFailureListener { exception ->
                     // Show empty state on failure
+                    android.util.Log.e("SearchActivity", "Search failed: ${exception.message}")
                     updateSearchResults(emptyList())
                 }
         } catch (e: Exception) {
+            android.util.Log.e("SearchActivity", "Search error: ${e.message}")
             updateSearchResults(emptyList())
         }
     }
@@ -353,15 +371,7 @@ class SearchActivity : AppCompatActivity() {
         dialog.show()
     }
 
-    private fun loadRecentSearches() {
-        // Load from SharedPreferences or database
-        // For now, using sample data
-        recentSearches.addAll(listOf("Carabao", "Chicken", "Goat"))
-    }
 
-    private fun saveRecentSearches() {
-        // Save to SharedPreferences or database
-    }
 
     private fun showRecentAndSuggestedSearches() {
         // Get the LinearLayout inside the ScrollView
@@ -494,8 +504,8 @@ class SearchActivity : AppCompatActivity() {
             val item = items[position]
             
             holder.nameText.text = item.name
-            holder.priceText.text = item.price
-            holder.sellerText.text = item.seller
+            holder.priceText.text = if (item.price.startsWith("₱")) item.price else "₱${item.price}"
+            holder.sellerText.text = item.seller.ifEmpty { "" }
             holder.locationText.text = item.location
             holder.statusBadge.text = item.status
 
@@ -526,5 +536,110 @@ class SearchActivity : AppCompatActivity() {
         }
 
         override fun getItemCount(): Int = items.size
+    }
+    
+    // Recent Searches Management
+    private fun loadRecentSearches() {
+        val sharedPrefs = getSharedPreferences("search_history", MODE_PRIVATE)
+        val searches = sharedPrefs.getStringSet("recent_searches", emptySet())?.toList() ?: emptyList()
+        recentSearches.clear()
+        recentSearches.addAll(searches)
+        updateRecentSearchesUI()
+    }
+    
+    private fun saveRecentSearches() {
+        val sharedPrefs = getSharedPreferences("search_history", MODE_PRIVATE)
+        val editor = sharedPrefs.edit()
+        editor.putStringSet("recent_searches", recentSearches.toSet())
+        editor.apply()
+    }
+    
+    private fun addToRecentSearches(query: String) {
+        if (query.isNotEmpty() && !recentSearches.contains(query)) {
+            recentSearches.add(0, query)
+            if (recentSearches.size > 5) {
+                recentSearches.removeAt(recentSearches.size - 1)
+            }
+            saveRecentSearches()
+            updateRecentSearchesUI()
+        }
+    }
+    
+    private fun updateRecentSearchesUI() {
+        recentSearchesContainerInner.removeAllViews()
+        
+        if (recentSearches.isEmpty()) {
+            val emptyView = TextView(this).apply {
+                text = "No recent searches"
+                setTextColor(resources.getColor(android.R.color.darker_gray, null))
+                textSize = 14f
+                setPadding(16, 8, 16, 8)
+            }
+            recentSearchesContainerInner.addView(emptyView)
+        } else {
+            recentSearches.forEach { search ->
+                val searchItemView = createRecentSearchItem(search)
+                recentSearchesContainerInner.addView(searchItemView)
+            }
+        }
+    }
+    
+    private fun createRecentSearchItem(search: String): LinearLayout {
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            setPadding(16, 12, 16, 12)
+            background = resources.getDrawable(android.R.drawable.list_selector_background, null)
+            
+            // Search text
+            val searchText = TextView(this@SearchActivity).apply {
+                text = search
+                setTextColor(resources.getColor(android.R.color.black, null))
+                textSize = 16f
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            }
+            addView(searchText)
+            
+            // Delete button
+            val deleteButton = TextView(this@SearchActivity).apply {
+                text = "✕"
+                setTextColor(resources.getColor(android.R.color.darker_gray, null))
+                textSize = 18f
+                setPadding(16, 8, 16, 8)
+                background = resources.getDrawable(android.R.drawable.list_selector_background, null)
+                gravity = android.view.Gravity.CENTER
+            }
+            addView(deleteButton)
+            
+            // Click listeners
+            setOnClickListener {
+                searchEditText.setText(search)
+                performSearch(search)
+            }
+            
+            deleteButton.setOnClickListener {
+                removeRecentSearch(search)
+            }
+        }
+    }
+    
+    private fun removeRecentSearch(search: String) {
+        recentSearches.remove(search)
+        saveRecentSearches()
+        updateRecentSearchesUI()
+    }
+    
+    private fun clearAllRecentSearches() {
+        AlertDialog.Builder(this)
+            .setTitle("Clear Recent Searches")
+            .setMessage("Are you sure you want to clear all recent searches?")
+            .setPositiveButton("Clear") { _, _ ->
+                recentSearches.clear()
+                saveRecentSearches()
+                updateRecentSearchesUI()
+                Toast.makeText(this, "Recent searches cleared", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 }

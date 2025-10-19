@@ -11,10 +11,10 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:background="#FFD700"
+        android:background="@color/white"
         android:padding="12dp">
 
-        <!-- Top Row: Back Button and Search Bar -->
+        <!-- Top Row: Back Button Only -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -44,8 +44,8 @@
                 app:boxCornerRadiusTopEnd="12dp"
                 app:boxCornerRadiusBottomStart="12dp"
                 app:boxCornerRadiusBottomEnd="12dp"
-                app:boxBackgroundColor="#FFFFFF"
-                app:hintTextColor="#999999">
+                app:boxBackgroundColor="@color/white"
+                app:hintTextColor="@color/text_hint">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/et_search"
@@ -53,7 +53,7 @@
                     android:layout_height="wrap_content"
                     android:hint="Search items, sellers, or categories..."
                     android:inputType="text"
-                    android:imeOptions="actionSearch"
+                    android:imeOptions="actionDone"
                     android:padding="16dp"
                     android:textSize="16sp"
                     android:drawableStart="@drawable/ic_search"
@@ -67,26 +67,17 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Search"
-                android:textColor="#FFFFFF"
+                android:textColor="@color/white"
                 android:textSize="14sp"
                 android:textStyle="bold"
                 android:minWidth="80dp"
                 android:paddingHorizontal="16dp"
                 android:paddingVertical="12dp"
                 app:cornerRadius="12dp"
-                app:backgroundTint="#FFD700"
+                app:backgroundTint="@color/yellow_accent"
                 app:rippleColor="#1F000000"
                 android:layout_marginEnd="4dp" />
 
-            <!-- Filter Button -->
-            <ImageView
-                android:id="@+id/btn_filter"
-                android:layout_width="32dp"
-                android:layout_height="32dp"
-                android:src="@drawable/ic_filter"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:padding="4dp"
-                android:contentDescription="Filter" />
 
         </LinearLayout>
 
@@ -118,7 +109,55 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-            <!-- Recent searches and suggested searches will be added dynamically here -->
+            <!-- Recent Searches Section -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginBottom="16dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginBottom="12dp">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Recent Searches"
+                        android:textColor="#000000"
+                        android:textSize="18sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/btn_clear_all"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Clear All"
+                        android:textColor="#FF6B6B"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:padding="8dp"
+                        android:contentDescription="Clear all recent searches" />
+
+                </LinearLayout>
+
+                <!-- Recent Searches Container -->
+                <LinearLayout
+                    android:id="@+id/ll_recent_searches_container"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <!-- Recent searches will be added dynamically here -->
+
+                </LinearLayout>
+
+            </LinearLayout>
 
         </LinearLayout>
 

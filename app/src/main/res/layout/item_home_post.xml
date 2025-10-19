@@ -63,16 +63,32 @@
 
         </LinearLayout>
 
-        <!-- Favorite Icon -->
-        <ImageView
-            android:id="@+id/iv_favorite"
-            android:layout_width="20dp"
-            android:layout_height="20dp"
-            android:src="@drawable/ic_favorite_border"
-            android:tint="@color/yellow_accent"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:padding="2dp"
-            android:contentDescription="Add to favorites" />
+        <!-- Favorite Icon and Count -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <ImageView
+                android:id="@+id/iv_favorite"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/ic_favorite_border"
+                android:tint="@color/yellow_accent"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:padding="2dp"
+                android:contentDescription="Add to favorites" />
+
+            <TextView
+                android:id="@+id/tv_favorite_count"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:text="0"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp" />
+        </LinearLayout>
 
     </LinearLayout>
 

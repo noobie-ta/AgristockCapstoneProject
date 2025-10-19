@@ -15,6 +15,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import com.example.agristockcapstoneproject.databinding.ActivityMainBinding
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
@@ -27,6 +28,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var drawerLayout: DrawerLayout
     private var currentFilter = "ALL" // ALL, SELL, BID
     private var postsListener: ListenerRegistration? = null
+    private var isRefreshing = false
+    private var isListView = true
+    private var notificationsListener: ListenerRegistration? = null
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -46,15 +50,28 @@ class MainActivity : AppCompatActivity() {
         setupClickListeners()
         setupNavigation()
         setupDrawerMenu()
+        setupSwipeRefresh()
+        setupNotificationBadge()
         displayPosts()
 
         // Ensure initial active state reflects Home
         setActiveNavItem(binding.navHome)
     }
 
+    private fun setupSwipeRefresh() {
+        val srl = findViewById<SwipeRefreshLayout>(R.id.srl_home_refresh)
+        srl.setOnRefreshListener {
+            // Re-attach the listener to force refresh and stop the spinner
+            isRefreshing = true
+            displayPosts()
+            srl.isRefreshing = false
+            isRefreshing = false
+        }
+    }
+
     override fun onResume() {
         super.onResume()
-        // Refresh posts when returning to the activity
+        // Always refresh posts when returning to the activity to get updated counters
         displayPosts()
         // Ensure bottom nav highlights Home when returning via back navigation
         setActiveNavItem(binding.navHome)
@@ -65,6 +82,8 @@ class MainActivity : AppCompatActivity() {
         // Detach listener to avoid leaks or duplicate callbacks
         postsListener?.remove()
         postsListener = null
+        notificationsListener?.remove()
+        notificationsListener = null
     }
 
     private fun setupClickListeners() {
@@ -95,25 +114,42 @@ class MainActivity : AppCompatActivity() {
             drawerLayout.openDrawer(GravityCompat.START)
         }
 
-        // Search functionality - navigate to search activity
-        binding.etSearch.setOnClickListener {
-            startActivity(Intent(this, SearchActivity::class.java))
+        // Search functionality - navigate to search activity with query
+        // Search icon button - trigger search with current input
+        findViewById<ImageView>(R.id.btn_search_icon).setOnClickListener {
+            val query = binding.etSearch.text.toString().trim()
+            val intent = Intent(this, SearchActivity::class.java)
+            if (query.isNotEmpty()) {
+                intent.putExtra("search_query", query)
+            }
+            startActivity(intent)
         }
-        
-        // Add text change listener for real-time search
-        binding.etSearch.addTextChangedListener(object : android.text.TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-            override fun afterTextChanged(s: android.text.Editable?) {
-                val query = s.toString().trim()
+
+        // Add search functionality to search input field
+        binding.etSearch.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH) {
+                val query = binding.etSearch.text.toString().trim()
                 if (query.isNotEmpty()) {
-                    // Navigate to search activity with query
-                    val intent = Intent(this@MainActivity, SearchActivity::class.java)
+                    val intent = Intent(this, SearchActivity::class.java)
                     intent.putExtra("search_query", query)
                     startActivity(intent)
                 }
+                true
+            } else {
+                false
             }
-        })
+        }
+
+        // View toggle buttons
+        findViewById<ImageView>(R.id.btn_list_view_home).setOnClickListener {
+            setViewOption(true)
+        }
+
+        findViewById<ImageView>(R.id.btn_grid_view_home).setOnClickListener {
+            setViewOption(false)
+        }
+        
+        // Remove real-time navigation to avoid duplicate search pages; tap opens search instead
         
         // Make search bar focusable for better UX
         binding.etSearch.isFocusable = true
@@ -128,12 +164,12 @@ class MainActivity : AppCompatActivity() {
 
         binding.navNotifications.setOnClickListener {
             setActiveNavItem(binding.navNotifications)
-            startActivity(Intent(this, NotificationActivity::class.java))
+            startActivity(Intent(this, NotificationsActivity::class.java))
         }
 
         binding.navMessages.setOnClickListener {
             setActiveNavItem(binding.navMessages)
-            Toast.makeText(this, "Messages coming soon!", Toast.LENGTH_SHORT).show()
+            startActivity(Intent(this, MessagesActivity::class.java))
         }
 
         binding.navSoldItems.setOnClickListener {
@@ -228,6 +264,28 @@ class MainActivity : AppCompatActivity() {
         displayPosts()
     }
 
+    private fun setViewOption(isList: Boolean) {
+        isListView = isList
+        
+        val btnListView = findViewById<ImageView>(R.id.btn_list_view_home)
+        val btnGridView = findViewById<ImageView>(R.id.btn_grid_view_home)
+        
+        if (isList) {
+            btnListView.background = ContextCompat.getDrawable(this, R.drawable.view_toggle_active)
+            btnListView.setColorFilter(ContextCompat.getColor(this, android.R.color.white))
+            btnGridView.background = ContextCompat.getDrawable(this, R.drawable.view_toggle_inactive)
+            btnGridView.setColorFilter(ContextCompat.getColor(this, R.color.text_secondary))
+        } else {
+            btnGridView.background = ContextCompat.getDrawable(this, R.drawable.view_toggle_active)
+            btnGridView.setColorFilter(ContextCompat.getColor(this, android.R.color.white))
+            btnListView.background = ContextCompat.getDrawable(this, R.drawable.view_toggle_inactive)
+            btnListView.setColorFilter(ContextCompat.getColor(this, R.color.text_secondary))
+        }
+        
+        // Refresh posts with new view
+        displayPosts()
+    }
+
     private fun displayPosts() {
         // Load posts from Firebase; avoid inequality filter to prevent failed precondition
         val postsRef = firestore.collection("posts")
@@ -271,8 +329,45 @@ class MainActivity : AppCompatActivity() {
                 if (filteredPosts.isEmpty()) {
                     showEmptyState()
                 } else {
-                    filteredPosts.forEach { post ->
-                        addPostCard(post)
+                    if (isListView) {
+                        // List View - add posts directly
+                        filteredPosts.forEach { post ->
+                            addPostCard(post)
+                        }
+                    } else {
+                        // Grid View - create 2-column layout
+                        val gridContainer = LinearLayout(this).apply {
+                            orientation = LinearLayout.VERTICAL
+                        }
+                        
+                        for (i in filteredPosts.indices step 2) {
+                            val rowLayout = LinearLayout(this).apply {
+                                orientation = LinearLayout.HORIZONTAL
+                                weightSum = 2f
+                            }
+                            
+                            // First column
+                            val itemView1 = LayoutInflater.from(this).inflate(R.layout.item_home_post_grid, null, false)
+                            val layoutParams1 = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                            layoutParams1.setMargins(0, 0, 6, 0)
+                            itemView1.layoutParams = layoutParams1
+                            setupPostItem(itemView1, filteredPosts[i])
+                            rowLayout.addView(itemView1)
+                            
+                            // Second column (if exists)
+                            if (i + 1 < filteredPosts.size) {
+                                val itemView2 = LayoutInflater.from(this).inflate(R.layout.item_home_post_grid, null, false)
+                                val layoutParams2 = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                                layoutParams2.setMargins(6, 0, 0, 0)
+                                itemView2.layoutParams = layoutParams2
+                                setupPostItem(itemView2, filteredPosts[i + 1])
+                                rowLayout.addView(itemView2)
+                            }
+                            
+                            gridContainer.addView(rowLayout)
+                        }
+                        
+                        binding.llPostsContainer.addView(gridContainer)
                     }
                 }
             } else {
@@ -283,26 +378,126 @@ class MainActivity : AppCompatActivity() {
 
     private fun addPostCard(post: Post) {
         val inflater = LayoutInflater.from(this)
-        val postView = inflater.inflate(R.layout.item_home_post, binding.llPostsContainer, false)
+        val postView = if (isListView) {
+            inflater.inflate(R.layout.item_home_post, binding.llPostsContainer, false)
+        } else {
+            inflater.inflate(R.layout.item_home_post_grid, binding.llPostsContainer, false)
+        }
         
         val tvName = postView.findViewById<TextView>(R.id.tv_post_name)
         val tvPrice = postView.findViewById<TextView>(R.id.tv_post_price)
         val tvTime = postView.findViewById<TextView>(R.id.tv_post_time)
+        val ivPostImage = postView.findViewById<ImageView>(R.id.iv_post_image)
+        val ivFavorite = postView.findViewById<ImageView>(R.id.iv_favorite)
+        val tvFavCount = postView.findViewById<TextView>(R.id.tv_favorite_count)
         val btnView = postView.findViewById<TextView>(R.id.btn_view_post)
         
         tvName.text = post.name
-        tvPrice.text = post.price
+        tvPrice.text = if (post.price.startsWith("₱")) post.price else "₱${post.price}"
         tvTime.text = post.time
         
         // 'View' is a small yellow pill for consistency
         
         btnView.setOnClickListener {
-            val intent = Intent(this, ItemDetailsActivity::class.java)
+            val intent = if (post.type == "BID") {
+                Intent(this, ViewBiddingActivity::class.java)
+            } else {
+                Intent(this, ItemDetailsActivity::class.java)
+            }
             intent.putExtra("postId", post.id)
             startActivity(intent)
         }
         
+        // Initialize favorite state and count with real-time updates
+        val uid = FirebaseAuth.getInstance().currentUser?.uid
+        val db = FirebaseFirestore.getInstance()
+        val postRef = db.collection("posts").document(post.id)
+        
+        // Load favorite count and image
+        postRef.get().addOnSuccessListener { doc ->
+            if (doc.exists()) {
+                val count = (doc.getLong("favoriteCount") ?: 0L).toInt()
+                tvFavCount.text = count.toString()
+                
+                // Load image from the post data
+                val imageUrl = doc.getString("imageUrl") ?: 
+                    (doc.get("imageUrls") as? List<*>)?.firstOrNull()?.toString()
+                
+                if (!imageUrl.isNullOrEmpty()) {
+                    com.bumptech.glide.Glide.with(this)
+                        .load(imageUrl)
+                        .centerCrop()
+                        .placeholder(R.drawable.ic_image_placeholder)
+                        .error(R.drawable.ic_image_placeholder)
+                        .into(ivPostImage)
+                } else {
+                    ivPostImage.setImageResource(R.drawable.ic_image_placeholder)
+                }
+            }
+        }
+        if (uid != null) {
+            db.collection("users").document(uid).collection("favorites").document(post.id)
+                .get()
+                .addOnSuccessListener { fdoc ->
+                    val isFav = fdoc.exists()
+                    ivFavorite.setImageResource(if (isFav) R.drawable.ic_favorite_filled_red else R.drawable.ic_favorite_border)
+                    if (!isFav) ivFavorite.setColorFilter(ContextCompat.getColor(this, R.color.yellow_accent)) else ivFavorite.clearColorFilter()
+                }
+        }
+
+        // Favorite button is display-only on homepage - no click functionality
+        // Users must go to the View Item page to add/remove favorites
+
         binding.llPostsContainer.addView(postView)
+    }
+
+    private fun setupPostItem(itemView: View, post: Post) {
+        val tvName = itemView.findViewById<TextView>(R.id.tv_post_name)
+        val tvPrice = itemView.findViewById<TextView>(R.id.tv_post_price)
+        val ivPostImage = itemView.findViewById<ImageView>(R.id.iv_post_image)
+        val tvFavCount = itemView.findViewById<TextView>(R.id.tv_favorites_count)
+        
+        tvName.text = post.name
+        tvPrice.text = if (post.price.startsWith("₱")) post.price else "₱${post.price}"
+        
+        // Load image and favorite count with real-time updates
+        val uid = FirebaseAuth.getInstance().currentUser?.uid
+        val db = FirebaseFirestore.getInstance()
+        val postRef = db.collection("posts").document(post.id)
+        
+        // Load favorite count and image
+        postRef.get().addOnSuccessListener { doc ->
+            if (doc.exists()) {
+                val count = (doc.getLong("favoriteCount") ?: 0L).toInt()
+                tvFavCount.text = count.toString()
+                
+                // Load image from the post data
+                val imageUrl = doc.getString("imageUrl") ?: 
+                    (doc.get("imageUrls") as? List<*>)?.firstOrNull()?.toString()
+                
+                if (!imageUrl.isNullOrEmpty()) {
+                    com.bumptech.glide.Glide.with(this)
+                        .load(imageUrl)
+                        .centerCrop()
+                        .placeholder(R.drawable.ic_image_placeholder)
+                        .error(R.drawable.ic_image_placeholder)
+                        .into(ivPostImage)
+                } else {
+                    ivPostImage.setImageResource(R.drawable.ic_image_placeholder)
+                }
+            }
+        }
+        
+        // Add click listener for grid items
+        itemView.setOnClickListener {
+            val intent = if (post.type == "BID") {
+                Intent(this, ViewBiddingActivity::class.java)
+            } else {
+                Intent(this, ItemDetailsActivity::class.java)
+            }
+            intent.putExtra("postId", post.id)
+            startActivity(intent)
+        }
     }
 
     private fun showEmptyState() {
@@ -374,4 +569,21 @@ class MainActivity : AppCompatActivity() {
         val time: String,
         val type: String // SELL or BID
     )
+    
+    private fun setupNotificationBadge() {
+        val uid = auth.currentUser?.uid ?: return
+        
+        notificationsListener = firestore.collection("notifications")
+            .whereEqualTo("toUserId", uid)
+            .whereEqualTo("isRead", false)
+            .addSnapshotListener { snapshot, exception ->
+                if (exception != null) {
+                    return@addSnapshotListener
+                }
+                
+                val unreadCount = snapshot?.size() ?: 0
+                val badge = findViewById<View>(R.id.badge_notifications)
+                badge.visibility = if (unreadCount > 0) View.VISIBLE else View.GONE
+            }
+    }
 }
