@@ -2,53 +2,248 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Posts: anyone can read, only authenticated users can create
+    // --- POSTS ---
     match /posts/{postId} {
       allow read: if true;
       allow create: if request.auth != null;
-      allow update, delete: if request.auth != null 
-                            && resource.data.userId == request.auth.uid;
-      // Allow any authenticated user to update favoriteCount
-      allow update: if request.auth != null && 
-        request.writeFields.hasOnly(['favoriteCount']);
+      allow update, delete: if request.auth != null &&
+        resource.data.userId == request.auth.uid;
+      // Allow any authenticated user to update favoriteCount and bidding fields
+      allow update: if request.auth != null &&
+        request.writeFields.hasOnly(['favoriteCount', 'highestBid', 'highestBidFormatted', 'totalBidders']);
+      // Allow seller to update status, soldAt, buyerId, and winnerId when marking as sold
+      allow update: if request.auth != null &&
+        resource.data.userId == request.auth.uid &&
+        request.writeFields.hasAny(['status', 'soldAt', 'buyerId', 'winnerId']);
+      // Allow admin to read, update, and delete any post
+      allow read, update, delete: if request.auth != null && 
+        request.auth.token.admin == true;
     }
-    
-    // Users: allow reading any user profile (for seller info), but only write own profile
+
+    // --- USERS ---
     match /users/{userId} {
-      // Allow authenticated users to read any user profile (for seller information)
       allow read: if request.auth != null;
-      // Only allow users to write their own profile
-      allow write: if request.auth != null && request.auth.uid == userId;
-      
-      // Users can manage their own favorites subcollection
+      // Allow users to write to their own profile, but NOT to admin-only fields
+      allow write: if request.auth != null && 
+        request.auth.uid == userId &&
+        // Prevent users from modifying admin-only fields
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['verificationStatus', 'biddingApprovalStatus', 'biddingBanned', 'role', 'isAdmin']);
+      // Allow any authenticated user to update rating and totalRatings fields
+      allow update: if request.auth != null &&
+        request.writeFields.hasOnly(['rating', 'totalRatings']);
+      // Allow admin to read, update, and delete any user (including protected fields)
+      allow read, update, delete: if request.auth != null && 
+        request.auth.token.admin == true;
+
       match /favorites/{favoriteId} {
         allow read, write: if request.auth != null && request.auth.uid == userId;
+        // Allow admin to read and manage any user's favorites
+        allow read, write: if request.auth != null && 
+          request.auth.token.admin == true;
       }
     }
-    
-    // Global favorites collection (if used)
+
+    // --- FAVORITES ---
     match /favorites/{favoriteId} {
-      allow read, write: if request.auth != null && 
+      allow read, write: if request.auth != null &&
         (resource == null || resource.data.userId == request.auth.uid);
+      // Allow admin to read and manage all favorites
+      allow read, write: if request.auth != null && 
+        request.auth.token.admin == true;
     }
-    
-    // Notifications collection
+
+    // --- NOTIFICATIONS ---
     match /notifications/{notificationId} {
       allow read, write: if request.auth != null;
+      allow list: if request.auth != null;
+      // Allow admin to read and manage all notifications
+      allow read, write, list: if request.auth != null && 
+        request.auth.token.admin == true;
     }
-    
-    // Chats collection - allow authenticated users to read/write chats
-    // The whereArrayContains query will filter to only chats they participate in
+
+    // --- CHATS ---
     match /chats/{chatId} {
-      allow read, write: if request.auth != null;
-      allow create: if request.auth != null;
+      // Allow any authenticated user to read chats (needed for whereArrayContains queries)
+      allow read: if request.auth != null;
+      // Allow participants to update chats
+      allow update: if request.auth != null &&
+        request.auth.uid in resource.data.participants;
+      // Allow participants to delete chats
+      allow delete: if request.auth != null &&
+        request.auth.uid in resource.data.participants;
+      // Allow creation if user is in participants
+      allow create: if request.auth != null &&
+        request.resource.data.participants.size() == 2 &&
+        request.auth.uid in request.resource.data.participants;
+      // Allow list operations for queries (including whereArrayContains)
+      allow list: if request.auth != null;
+      // Allow admin to read, update, and delete any chat
+      allow read, update, delete, list: if request.auth != null && 
+        request.auth.token.admin == true;
     }
-    
-    // Messages collection - allow authenticated users to read/write messages
-    // The whereEqualTo("chatId", chatId) query will filter appropriately
+
+    // --- MESSAGES (Top-level collection as used in your app) ---
     match /messages/{messageId} {
+      // Allow users to read messages they sent or received
+      allow read: if request.auth != null && 
+        (resource.data.senderId == request.auth.uid || 
+         resource.data.receiverId == request.auth.uid);
+      // Allow users to create messages
+      allow create: if request.auth != null &&
+        request.resource.data.senderId == request.auth.uid;
+      // Allow users to update messages they sent (for read status)
+      allow update: if request.auth != null &&
+        (resource.data.senderId == request.auth.uid || 
+         resource.data.receiverId == request.auth.uid);
+      // Allow list operations for queries (needed for whereEqualTo queries)
+      allow list: if request.auth != null;
+      // Allow admin to read and manage all messages
+      allow read, write, create, list: if request.auth != null && 
+        request.auth.token.admin == true;
+    }
+
+    // --- BIDS ---
+    match /bids/{bidId} {
       allow read, write: if request.auth != null;
       allow create: if request.auth != null;
+      allow list: if request.auth != null;
+      // Allow admin to read and manage all bids
+      allow read, write, create, list: if request.auth != null && 
+        request.auth.token.admin == true;
+    }
+
+    // --- REPORTS ---
+    match /reports/{reportId} {
+      allow read, write: if request.auth != null;
+      allow create: if request.auth != null;
+      allow list: if request.auth != null;
+      // Allow admin to read and manage all reports
+      allow read, write, create, list: if request.auth != null && 
+        request.auth.token.admin == true;
+    }
+
+    // --- BLOCKS ---
+    match /blocks/{blockId} {
+      allow read, write: if request.auth != null;
+      allow create: if request.auth != null;
+      allow list: if request.auth != null;
+      // Allow admin to read and manage all blocks
+      allow read, write, create, list: if request.auth != null && 
+        request.auth.token.admin == true;
+    }
+
+    // --- MUTED CHATS ---
+    match /mutedChats/{muteId} {
+      allow read, write: if request.auth != null;
+      allow create: if request.auth != null;
+      allow list: if request.auth != null;
+      // Allow admin to read and manage all muted chats
+      allow read, write, create, list: if request.auth != null && 
+        request.auth.token.admin == true;
+    }
+
+    // --- VERIFICATION REQUESTS ---
+    match /verification_requests/{requestId} {
+      // Allow users to read their own verification requests
+      allow read: if request.auth != null && 
+        (resource.data.userId == request.auth.uid || 
+         // Allow admin users to read all verification requests
+         request.auth.token.admin == true);
+      // Allow users to create their own verification requests
+      allow create: if request.auth != null && 
+        request.resource.data.userId == request.auth.uid;
+      // Allow users to update their own verification requests (for status updates)
+      allow update: if request.auth != null && 
+        resource.data.userId == request.auth.uid;
+      // Allow admin users to update any verification request
+      allow update: if request.auth != null && 
+        request.auth.token.admin == true;
+      // Allow list operations for users to see their own requests
+      allow list: if request.auth != null;
+      // Allow admin to read and manage all verification requests
+      allow read, write, create, list: if request.auth != null && 
+        request.auth.token.admin == true;
+    }
+
+    // --- ADMIN COLLECTIONS ---
+    // Allow admin to access any collection for management purposes
+    match /admin/{document=**} {
+      allow read, write, create, delete, list: if request.auth != null && 
+        request.auth.token.admin == true;
+    }
+
+    // --- ANALYTICS AND STATS ---
+    match /analytics/{document=**} {
+      allow read, write, create, delete, list: if request.auth != null && 
+        request.auth.token.admin == true;
+    }
+
+    // --- SYSTEM LOGS ---
+    match /logs/{document=**} {
+      allow read, write, create, delete, list: if request.auth != null && 
+        request.auth.token.admin == true;
+    }
+
+        // --- ADMIN SETTINGS ---
+        match /admin_settings/{settingId} {
+          allow read, write, create, delete, list: if request.auth != null && 
+            request.auth.token.admin == true;
+        }
+
+        // --- USER SETTINGS ---
+        match /userSettings/{userId} {
+          allow read, write: if request.auth != null && request.auth.uid == userId;
+          // Allow admin to read and manage any user's settings
+          allow read, write: if request.auth != null && 
+            request.auth.token.admin == true;
+        }
+
+    // --- SUPPORT TICKETS ---
+    match /supportTickets/{ticketId} {
+      // Allow users to read and create their own tickets
+      allow read, create: if request.auth != null && 
+        (resource == null || resource.data.userId == request.auth.uid);
+      // Allow users to update their own tickets
+      allow update: if request.auth != null && 
+        resource.data.userId == request.auth.uid;
+      // Allow admin to read and manage all tickets
+      allow read, write, create, list: if request.auth != null && 
+        request.auth.token.admin == true;
+    }
+
+    // --- RATINGS ---
+    match /ratings/{ratingId} {
+      // Allow anyone to read ratings (for display)
+      allow read: if request.auth != null;
+      // Allow buyers to create ratings for sellers
+      allow create: if request.auth != null &&
+        request.resource.data.buyerId == request.auth.uid;
+      // Allow users to update their own ratings
+      allow update: if request.auth != null &&
+        resource.data.buyerId == request.auth.uid;
+      // Allow users to delete their own ratings
+      allow delete: if request.auth != null &&
+        resource.data.buyerId == request.auth.uid;
+      // Allow list operations for queries
+      allow list: if request.auth != null;
+      // Allow admin to manage all ratings
+      allow read, write, create, delete, list: if request.auth != null && 
+        request.auth.token.admin == true;
+    }
+
+    // --- TRANSACTIONS ---
+    match /transactions/{transactionId} {
+      // Allow users to read their own transactions (as buyer or seller)
+      allow read: if request.auth != null &&
+        (resource.data.buyerId == request.auth.uid || 
+         resource.data.sellerId == request.auth.uid);
+      // Allow system to create transactions
+      allow create: if request.auth != null;
+      // Allow list operations for queries
+      allow list: if request.auth != null;
+      // Allow admin to manage all transactions
+      allow read, write, create, delete, list: if request.auth != null && 
+        request.auth.token.admin == true;
     }
   }
 }

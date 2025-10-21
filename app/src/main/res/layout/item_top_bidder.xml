@@ -4,44 +4,46 @@
     android:layout_height="wrap_content"
     android:orientation="horizontal"
     android:padding="12dp"
-    android:background="@drawable/item_background"
-    android:layout_marginBottom="4dp"
+    android:background="@android:color/transparent"
     android:gravity="center_vertical">
 
-    <TextView
-        android:id="@+id/tv_rank"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="#1"
-        android:textColor="#FFD700"
-        android:textSize="16sp"
-        android:textStyle="bold"
-        android:layout_marginEnd="12dp"
-        android:minWidth="32dp"
-        android:gravity="center" />
+    <!-- Rank Circle -->
+    <FrameLayout
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_marginEnd="16dp">
+        
+        <TextView
+            android:id="@+id/tv_rank"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:text="1"
+            android:textColor="@android:color/white"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:background="@drawable/rank_circle_gold"/>
+    </FrameLayout>
 
+    <!-- Bidder Name -->
     <TextView
         android:id="@+id/tv_bidder_name"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:text="John Doe"
+        android:text="h7Tw3"
         android:textColor="@color/black"
         android:textSize="16sp"
-        android:textStyle="bold" />
+        android:textStyle="normal"/>
 
+    <!-- Bid Amount -->
     <TextView
         android:id="@+id/tv_bid_amount"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="₱2,500"
+        android:text="₱9,999,999.00"
         android:textColor="#FFD700"
         android:textSize="16sp"
-        android:textStyle="bold" />
+        android:textStyle="bold"/>
 
 </LinearLayout>
-
-
-
-
-

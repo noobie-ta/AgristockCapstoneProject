@@ -73,7 +73,7 @@ class EditPostActivity : AppCompatActivity() {
 
 		val imageUri = pendingImageUri
 		if (imageUri != null) {
-			val ref = storage.reference.child("post_images/${postId}.jpg")
+			val ref = storage.reference.child("post_images/${user.uid}/${postId}.jpg")
 			ref.putFile(imageUri)
 				.continueWithTask { task ->
 					if (!task.isSuccessful) throw task.exception ?: RuntimeException("Upload failed")

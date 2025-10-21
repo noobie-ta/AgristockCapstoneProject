@@ -12,19 +12,21 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:background="@color/white"
-        android:padding="16dp"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="16dp"
+        android:paddingTop="40dp"
         android:elevation="4dp"
         android:gravity="center_vertical">
 
         <ImageView
             android:id="@+id/btn_back"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
             android:src="@drawable/ic_arrow_back"
-            android:contentDescription="Back"
-            android:tint="@color/text_secondary"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:padding="8dp" />
+            android:padding="4dp"
+            android:contentDescription="Back" />
 
         <TextView
             android:layout_width="0dp"
@@ -32,20 +34,20 @@
             android:layout_weight="1"
             android:gravity="center"
             android:text="Profile"
-            android:textColor="@color/text_primary"
+            android:textColor="#000000"
             android:textSize="20sp"
             android:textStyle="bold"
             android:fontFamily="sans-serif-medium" />
 
         <ImageView
             android:id="@+id/btn_edit_profile"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
             android:src="@drawable/ic_edit"
             android:contentDescription="Edit Profile"
             android:tint="@color/yellow_accent"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:padding="8dp" />
+            android:padding="4dp" />
 
     </LinearLayout>
 
@@ -193,7 +195,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_gravity="center_horizontal"
-                    android:layout_marginTop="8dp"
+                    android:layout_marginTop="4dp"
                     android:orientation="horizontal">
 
                     <ImageView
@@ -240,50 +242,6 @@
 
                 </LinearLayout>
 
-                <!-- Profile Completion Bar -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
-                    android:orientation="vertical">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical">
-
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="Profile Completion"
-                            android:textColor="@color/text_secondary"
-                            android:textSize="12sp"
-                            android:fontFamily="sans-serif" />
-
-                        <TextView
-                            android:id="@+id/tv_completion_percentage"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="60%"
-                            android:textColor="@color/yellow_accent"
-                            android:textSize="12sp"
-                            android:textStyle="bold"
-                            android:fontFamily="sans-serif-medium" />
-
-                    </LinearLayout>
-
-                    <ProgressBar
-                        android:id="@+id/progress_completion"
-                        style="?android:attr/progressBarStyleHorizontal"
-                        android:layout_width="match_parent"
-                        android:layout_height="4dp"
-                        android:layout_marginTop="4dp"
-                        android:progress="60"
-                        android:progressTint="@color/yellow_accent" />
-
-                </LinearLayout>
 
                 <!-- Ratings Section -->
                 <LinearLayout
@@ -382,7 +340,7 @@
             <!-- Posts Section Header -->
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="91dp"
+                android:layout_height="wrap_content"
                 android:layout_marginStart="16dp"
                 android:layout_marginEnd="16dp"
                 android:layout_marginBottom="8dp"
@@ -390,7 +348,8 @@
                 android:elevation="2dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:padding="16dp">
+                android:paddingVertical="12dp"
+                android:paddingHorizontal="16dp">
 
                 <TextView
                     android:layout_width="0dp"
@@ -402,84 +361,67 @@
                     android:textSize="18sp"
                     android:textStyle="bold" />
 
-                <!-- Sort and View Options -->
+                <!-- Filter Button -->
                 <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
+                    android:id="@+id/btn_filter"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:background="@drawable/filter_button_background"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="12dp"
+                    android:paddingVertical="8dp"
+                    android:layout_marginEnd="8dp">
 
-                    <!-- Sort Options -->
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="horizontal">
+                    <ImageView
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:src="@drawable/ic_filter"
+                        android:tint="@color/text_primary" />
 
-                        <TextView
-                            android:id="@+id/btn_sort_newest"
-                            android:layout_width="wrap_content"
-                            android:layout_height="32dp"
-                            android:background="@drawable/sort_button_active"
-                            android:clickable="true"
-                            android:focusable="true"
-                            android:fontFamily="sans-serif-medium"
-                            android:gravity="center"
-                            android:paddingHorizontal="12dp"
-                            android:text="Newest"
-                            android:textColor="@color/white"
-                            android:textSize="12sp"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:id="@+id/btn_sort_oldest"
-                            android:layout_width="wrap_content"
-                            android:layout_height="32dp"
-                            android:layout_marginStart="8dp"
-                            android:background="@drawable/sort_button_inactive"
-                            android:clickable="true"
-                            android:focusable="true"
-                            android:fontFamily="sans-serif-medium"
-                            android:gravity="center"
-                            android:paddingHorizontal="12dp"
-                            android:text="Oldest"
-                            android:textColor="@color/text_secondary"
-                            android:textSize="12sp" />
-
-                    </LinearLayout>
-
-                    <!-- View Toggle Options -->
-                    <LinearLayout
+                    <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:background="@drawable/view_toggle_background"
-                        android:orientation="horizontal"
-                        android:padding="2dp">
+                        android:layout_marginStart="6dp"
+                        android:text="Filter"
+                        android:textColor="@color/text_primary"
+                        android:textSize="14sp"
+                        android:fontFamily="sans-serif-medium" />
 
-                        <ImageView
-                            android:id="@+id/btn_list_view"
-                            android:layout_width="32dp"
-                            android:layout_height="32dp"
-                            android:background="@drawable/view_toggle_active"
-                            android:clickable="true"
-                            android:contentDescription="List View"
-                            android:focusable="true"
-                            android:padding="6dp"
-                            android:src="@drawable/ic_list_view" />
+                </LinearLayout>
 
-                        <ImageView
-                            android:id="@+id/btn_grid_view"
-                            android:layout_width="32dp"
-                            android:layout_height="32dp"
-                            android:layout_marginStart="2dp"
-                            android:background="@drawable/view_toggle_inactive"
-                            android:clickable="true"
-                            android:contentDescription="Grid View"
-                            android:focusable="true"
-                            android:padding="6dp"
-                            android:src="@drawable/ic_grid_view" />
+                <!-- View Toggle Options -->
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/view_toggle_background"
+                    android:orientation="horizontal"
+                    android:padding="2dp">
 
-                    </LinearLayout>
+                    <ImageView
+                        android:id="@+id/btn_list_view"
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:background="@drawable/view_toggle_active"
+                        android:clickable="true"
+                        android:contentDescription="List View"
+                        android:focusable="true"
+                        android:padding="6dp"
+                        android:src="@drawable/ic_list_view" />
+
+                    <ImageView
+                        android:id="@+id/btn_grid_view"
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:layout_marginStart="2dp"
+                        android:background="@drawable/view_toggle_inactive"
+                        android:clickable="true"
+                        android:contentDescription="Grid View"
+                        android:focusable="true"
+                        android:padding="6dp"
+                        android:src="@drawable/ic_grid_view" />
 
                 </LinearLayout>
 

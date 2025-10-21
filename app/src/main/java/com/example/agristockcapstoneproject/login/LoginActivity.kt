@@ -120,7 +120,9 @@ class LoginActivity : AppCompatActivity() {
                     "email" to (currentUser.email ?: ""),
                     "phone" to (currentUser.phoneNumber ?: ""),
                     "createdAt" to com.google.firebase.Timestamp.now(),
-                    "isEmailVerified" to currentUser.isEmailVerified
+                    "isEmailVerified" to currentUser.isEmailVerified,
+                    "rating" to 0.0,
+                    "totalRatings" to 0L
                 )
                 userDocRef.set(userData)
                     .addOnSuccessListener { navigateToMain() }

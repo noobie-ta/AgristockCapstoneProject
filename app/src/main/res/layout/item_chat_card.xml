@@ -1,12 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/card_chat"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="horizontal"
-    android:padding="16dp"
-    android:background="@drawable/item_card_background"
-    android:layout_margin="4dp"
-    android:gravity="center_vertical">
+    android:layout_margin="8dp"
+    app:cardCornerRadius="16dp"
+    app:cardElevation="2dp"
+    app:cardBackgroundColor="@android:color/white"
+    app:strokeWidth="0dp"
+    android:foreground="?attr/selectableItemBackground"
+    android:clickable="true"
+    android:focusable="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="16dp"
+        android:gravity="center_vertical">
 
     <!-- Avatar -->
     <FrameLayout
@@ -28,7 +40,7 @@
             android:layout_width="12dp"
             android:layout_height="12dp"
             android:layout_gravity="bottom|end"
-            android:background="@drawable/circle_background"
+            android:background="@drawable/online_indicator"
             android:visibility="gone" />
 
     </FrameLayout>
@@ -40,7 +52,7 @@
         android:layout_weight="1"
         android:orientation="vertical">
 
-        <!-- Username and Timestamp -->
+        <!-- Chat Title and Timestamp -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -48,12 +60,12 @@
             android:gravity="center_vertical">
 
             <TextView
-                android:id="@+id/tv_username"
+                android:id="@+id/tv_chat_title"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="Username"
-                android:textColor="@color/text_primary"
+                android:text="Username - Item Title"
+                android:textColor="#000B58"
                 android:textSize="16sp"
                 android:textStyle="bold"
                 android:fontFamily="sans-serif-medium"
@@ -65,7 +77,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="2m ago"
-                android:textColor="@color/text_secondary"
+                android:textColor="@android:color/darker_gray"
                 android:textSize="12sp"
                 android:layout_marginStart="8dp" />
 
@@ -85,7 +97,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:text="Last message preview..."
-                android:textColor="@color/text_secondary"
+                android:textColor="@android:color/darker_gray"
                 android:textSize="14sp"
                 android:maxLines="1"
                 android:ellipsize="end" />
@@ -109,6 +121,11 @@
 
     </LinearLayout>
 
-</LinearLayout>
+    </LinearLayout>
+
+</com.google.android.material.card.MaterialCardView>
+
+
+
 
 

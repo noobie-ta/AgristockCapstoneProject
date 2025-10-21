@@ -20,7 +20,9 @@
             android:layout_height="match_parent"
             android:background="@color/gray_100"
             android:contentDescription="Post image"
-            android:scaleType="centerCrop" />
+            android:scaleType="centerCrop"
+            android:clickable="true"
+            android:focusable="true" />
 
         <!-- Loading Shimmer Effect -->
         <LinearLayout

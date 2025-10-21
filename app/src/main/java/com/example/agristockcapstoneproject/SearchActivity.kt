@@ -25,7 +25,8 @@ class SearchActivity : AppCompatActivity() {
         val imageUrl: String?,
         val status: String,
         val category: String,
-        val type: String = "SELL" // SELL or BID
+        val type: String = "SELL", // SELL or BID
+        val soldAt: Long = 0L
     )
 
     private lateinit var searchEditText: EditText
@@ -56,6 +57,9 @@ class SearchActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_search)
+
+        // Configure status bar - transparent to show phone status
+        com.example.agristockcapstoneproject.utils.StatusBarUtil.makeTransparent(this, lightIcons = true)
 
         initializeViews()
         setupClickListeners()
@@ -172,11 +176,13 @@ class SearchActivity : AppCompatActivity() {
                             imageUrl = doc.getString("imageUrl"),
                             status = doc.getString("status") ?: "FOR SALE",
                             category = doc.getString("category") ?: "OTHER",
-                            type = doc.getString("type") ?: "SELL"
+                            type = doc.getString("type") ?: "SELL",
+                            soldAt = doc.getLong("soldAt") ?: 0L
                         )
                     }
 
                     // Client-side search filtering
+                    val currentTime = System.currentTimeMillis()
                     val searchResults = mapped.filter { item ->
                         // Search in title, description, category, and seller name
                         val searchText = query.lowercase()
@@ -185,8 +191,18 @@ class SearchActivity : AppCompatActivity() {
                         val sellerMatch = item.seller.lowercase().contains(searchText)
                         val locationMatch = item.location.lowercase().contains(searchText)
                         
-                        (titleMatch || categoryMatch || sellerMatch || locationMatch) &&
-                        item.status.uppercase() != "SOLD"
+                        val matchesSearch = titleMatch || categoryMatch || sellerMatch || locationMatch
+                        
+                        // Filter out SOLD items older than 24 hours
+                        val isAvailable = if (item.status.uppercase() == "SOLD") {
+                            val twentyFourHoursInMillis = 24 * 60 * 60 * 1000L
+                            // Keep if soldAt is set and less than 24 hours old
+                            item.soldAt != 0L && (currentTime - item.soldAt) <= twentyFourHoursInMillis
+                        } else {
+                            true // Not sold, show it
+                        }
+                        
+                        matchesSearch && isAvailable
                     }
 
                     // Apply additional filters

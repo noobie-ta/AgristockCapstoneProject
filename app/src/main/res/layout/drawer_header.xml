@@ -9,13 +9,14 @@
     <!-- Profile Picture -->
     <ImageView
         android:id="@+id/iv_profile_picture"
-        android:layout_width="80dp"
-        android:layout_height="80dp"
+        android:layout_width="100dp"
+        android:layout_height="100dp"
         android:layout_gravity="center_horizontal"
-        android:layout_marginBottom="16dp"
-        android:src="@android:drawable/ic_menu_gallery"
+        android:layout_marginBottom="20dp"
+        android:src="@drawable/ic_profile"
         android:background="@drawable/circle_background"
-        android:scaleType="centerCrop" />
+        android:scaleType="centerCrop"
+        android:padding="4dp" />
 
     <!-- Username -->
     <TextView
@@ -23,11 +24,12 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center_horizontal"
-        android:layout_marginBottom="8dp"
+        android:layout_marginBottom="12dp"
         android:text="Username"
         android:textColor="#000000"
-        android:textSize="18sp"
-        android:textStyle="bold" />
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:fontFamily="sans-serif-medium" />
 
     <!-- Removed Edit Profile button per design update -->
 

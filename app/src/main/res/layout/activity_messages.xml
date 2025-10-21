@@ -12,16 +12,18 @@
         android:layout_height="wrap_content"
         android:background="@color/white"
         android:orientation="horizontal"
-        android:padding="16dp"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="16dp"
+        android:paddingTop="40dp"
         android:gravity="center_vertical"
         android:elevation="4dp">
 
         <ImageView
             android:id="@+id/btn_back"
-            android:layout_width="24dp"
-            android:layout_height="24dp"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
             android:src="@drawable/ic_arrow_back"
-            android:tint="@color/text_primary"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:padding="4dp"
             android:contentDescription="Back" />
@@ -32,10 +34,14 @@
             android:layout_weight="1"
             android:layout_marginStart="16dp"
             android:text="Messages"
-            android:textColor="@color/text_primary"
+            android:textColor="#000000"
             android:textSize="20sp"
             android:textStyle="bold"
-            android:fontFamily="sans-serif-medium" />
+            android:gravity="center" />
+
+        <Space
+            android:layout_width="32dp"
+            android:layout_height="1dp" />
 
     </LinearLayout>
 
@@ -71,14 +77,21 @@
         android:layout_marginTop="32dp"
         android:visibility="gone" />
 
-    <!-- Chats List -->
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/rv_chats"
+    <!-- Chats List with SwipeRefresh -->
+    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+        android:id="@+id/swipe_refresh"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"
-        android:padding="8dp"
-        android:clipToPadding="false" />
+        android:layout_weight="1">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rv_chats"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:padding="8dp"
+            android:clipToPadding="false" />
+
+    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
     <!-- Empty State -->
     <LinearLayout

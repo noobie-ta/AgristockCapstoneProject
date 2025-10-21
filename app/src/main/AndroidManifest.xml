@@ -8,6 +8,15 @@
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <!-- For reading gallery images pre-Android 13 -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    
+    <!-- Location permissions for Google Maps -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    
+    <!-- Camera permission for ID verification -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="true" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
 
     <application
         android:allowBackup="true"
@@ -19,6 +28,16 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.AgristockCapstoneProject"
         tools:targetApi="31">
+
+        <!-- Google Maps API Key -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="@string/google_maps_key" />
+        
+        <!-- Google Play Services Version -->
+        <meta-data
+            android:name="com.google.android.gms.version"
+            android:value="@integer/google_play_services_version" />
 
         <!-- Splash Activity (Launch Activity) -->
         <activity
@@ -99,6 +118,18 @@
             android:exported="false"
             android:theme="@style/Theme.AgristockCapstoneProject" />
 
+        <!-- Post Preview Activity -->
+        <activity
+            android:name=".PostPreviewActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AgristockCapstoneProject" />
+
+        <!-- Bid Post Preview Activity -->
+        <activity
+            android:name=".BidPostPreviewActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AgristockCapstoneProject" />
+
         <!-- Sold Items Activity -->
         <activity
             android:name=".SoldItemsActivity"
@@ -122,6 +153,19 @@
             android:name=".VerificationActivity"
             android:exported="false"
             android:theme="@style/Theme.AgristockCapstoneProject" />
+
+        <!-- ID Verification Activity -->
+        <activity
+            android:name=".IdVerificationActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AgristockCapstoneProject" />
+
+        <!-- Selfie Verification Activity -->
+        <activity
+            android:name=".SelfieVerificationActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AgristockCapstoneProject"
+            android:screenOrientation="portrait" />
 
         <!-- Image Cropper Activity -->
         <activity
@@ -162,6 +206,18 @@
         <!-- Chat Room Activity -->
         <activity
             android:name=".ChatRoomActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AgristockCapstoneProject" />
+
+        <!-- Location Picker Activity -->
+        <activity
+            android:name=".LocationPickerActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AgristockCapstoneProject" />
+
+        <!-- Map Preview Activity -->
+        <activity
+            android:name=".MapPreviewActivity"
             android:exported="false"
             android:theme="@style/Theme.AgristockCapstoneProject" />
 

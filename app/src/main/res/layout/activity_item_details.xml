@@ -11,7 +11,10 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:background="#FFFFFF"
-        android:padding="16dp"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="16dp"
+        android:paddingTop="40dp"
         android:elevation="2dp">
 
         <ImageView
@@ -58,14 +61,51 @@
             android:orientation="vertical"
             android:padding="16dp">
 
-            <!-- Image Pager Placeholder (swipe + zoom could be implemented with a library) -->
-            <ImageView
-                android:id="@+id/iv_item_image"
+            <!-- Image with Indicators -->
+            <FrameLayout
                 android:layout_width="match_parent"
-                android:layout_height="220dp"
-                android:scaleType="centerCrop"
-                android:background="#EEEEEE"
-                android:contentDescription="Item image" />
+                android:layout_height="220dp">
+
+                <ImageView
+                    android:id="@+id/iv_item_image"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="centerCrop"
+                    android:background="#EEEEEE"
+                    android:contentDescription="Item image"
+                    android:clickable="true"
+                    android:focusable="true" />
+
+                <!-- Image Count Indicator -->
+                <TextView
+                    android:id="@+id/tv_image_count"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="top|end"
+                    android:layout_margin="12dp"
+                    android:background="@drawable/circle_white_background"
+                    android:padding="8dp"
+                    android:text="+2"
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:visibility="gone" />
+
+                <!-- Multiple Images Indicator -->
+                <LinearLayout
+                    android:id="@+id/ll_image_indicators"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="bottom|center_horizontal"
+                    android:layout_margin="12dp"
+                    android:orientation="horizontal"
+                    android:visibility="gone">
+
+                    <!-- Indicators will be added dynamically -->
+
+                </LinearLayout>
+
+            </FrameLayout>
 
             <!-- Seller Info -->
             <LinearLayout
@@ -101,15 +141,41 @@
                         android:textSize="16sp" />
 
                     <LinearLayout
+                        android:id="@+id/ll_rating_stars"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:orientation="horizontal">
 
-                        <ImageView android:layout_width="16dp" android:layout_height="16dp" android:src="@drawable/ic_shield" android:tint="#FFC107" />
-                        <ImageView android:layout_width="16dp" android:layout_height="16dp" android:src="@drawable/ic_shield" android:tint="#FFC107" />
-                        <ImageView android:layout_width="16dp" android:layout_height="16dp" android:src="@drawable/ic_shield" android:tint="#FFC107" />
-                        <ImageView android:layout_width="16dp" android:layout_height="16dp" android:src="@drawable/ic_shield" android:tint="#FFC107" />
-                        <ImageView android:layout_width="16dp" android:layout_height="16dp" android:src="@drawable/ic_shield" android:tint="#E0E0E0" />
+                        <ImageView 
+                            android:id="@+id/star1"
+                            android:layout_width="16dp" 
+                            android:layout_height="16dp" 
+                            android:src="@drawable/ic_star_filled" 
+                            android:tint="#FFC107" />
+                        <ImageView 
+                            android:id="@+id/star2"
+                            android:layout_width="16dp" 
+                            android:layout_height="16dp" 
+                            android:src="@drawable/ic_star_filled" 
+                            android:tint="#FFC107" />
+                        <ImageView 
+                            android:id="@+id/star3"
+                            android:layout_width="16dp" 
+                            android:layout_height="16dp" 
+                            android:src="@drawable/ic_star_filled" 
+                            android:tint="#FFC107" />
+                        <ImageView 
+                            android:id="@+id/star4"
+                            android:layout_width="16dp" 
+                            android:layout_height="16dp" 
+                            android:src="@drawable/ic_star_filled" 
+                            android:tint="#FFC107" />
+                        <ImageView 
+                            android:id="@+id/star5"
+                            android:layout_width="16dp" 
+                            android:layout_height="16dp" 
+                            android:src="@drawable/ic_star_filled" 
+                            android:tint="#E0E0E0" />
 
                     </LinearLayout>
                 </LinearLayout>
@@ -146,20 +212,91 @@
                     android:textColor="#444444"
                     android:layout_marginTop="4dp" />
 
-                <TextView
-                    android:id="@+id/tv_category_badge"
+                <!-- Category and Sale/Trade Type -->
+                <LinearLayout
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="8dp">
+
+                    <TextView
+                        android:id="@+id/tv_category_badge"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/badge_sell"
+                        android:paddingLeft="10dp"
+                        android:paddingTop="4dp"
+                        android:paddingRight="10dp"
+                        android:paddingBottom="4dp"
+                        android:text="CATEGORY"
+                        android:textAllCaps="true"
+                        android:textSize="12sp"
+                        android:textColor="#ffffff" />
+
+                    <TextView
+                        android:id="@+id/tv_sale_trade_badge"
+                        android:layout_width="wrap_content"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="8dp"
+                        android:background="@drawable/status_chip_available"
+                        android:paddingHorizontal="8dp"
+                        android:paddingVertical="4dp"
+                        android:text="SALE"
+                        android:textAllCaps="true"
+                        android:textColor="@color/white"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tv_sold_badge"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:text="SOLD"
+                        android:textAllCaps="true"
+                        android:textSize="12sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/white"
+                        android:background="@drawable/badge_sold"
+                        android:paddingHorizontal="10dp"
+                        android:paddingVertical="4dp"
+                        android:visibility="gone" />
+
+                </LinearLayout>
+
+                <!-- Trade Description (shown when trade is selected) -->
+                <LinearLayout
+                    android:id="@+id/ll_trade_info"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
                     android:layout_marginTop="8dp"
-                    android:background="@drawable/badge_sell"
-                    android:paddingLeft="10dp"
-                    android:paddingTop="4dp"
-                    android:paddingRight="10dp"
-                    android:paddingBottom="4dp"
-                    android:text="CATEGORY"
-                    android:textAllCaps="true"
-                    android:textSize="12sp"
-                    android:textColor="#000000" />
+                    android:visibility="gone">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="🔍 Looking for:"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="10sp"
+                        android:textStyle="bold"
+                        android:layout_marginEnd="4dp" />
+
+                    <TextView
+                        android:id="@+id/tv_trade_description"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Trade Description"
+                        android:textColor="@color/white"
+                        android:textSize="10sp"
+                        android:textStyle="bold"
+                        android:background="@drawable/trade_badge_background"
+                        android:paddingHorizontal="6dp"
+                        android:paddingVertical="2dp"
+                        android:maxLines="1"
+                        android:ellipsize="end" />
+
+                </LinearLayout>
 
                 <TextView
                     android:id="@+id/tv_time_posted"
@@ -189,6 +326,50 @@
                     android:text="Read more"
                     android:textColor="#007BFF"
                     android:layout_marginTop="4dp" />
+
+                <!-- Location Section -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="16dp"
+                    android:padding="12dp"
+                    android:background="@drawable/location_background"
+                    android:gravity="center_vertical">
+
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:src="@drawable/ic_location_pin"
+                        android:tint="@color/button_bid_text"
+                        android:layout_marginEnd="8dp" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Location"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="12sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tv_item_location"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Location not specified"
+                            android:textColor="@color/text_primary"
+                            android:textSize="14sp"
+                            android:layout_marginTop="2dp" />
+
+                    </LinearLayout>
+
+                </LinearLayout>
 
             </LinearLayout>
 

@@ -11,19 +11,21 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:background="@color/white"
-        android:padding="16dp"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="16dp"
+        android:paddingTop="40dp"
         android:elevation="4dp"
         android:gravity="center_vertical">
 
         <ImageView
             android:id="@+id/btn_back"
-            android:layout_width="24dp"
-            android:layout_height="24dp"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
             android:src="@drawable/ic_arrow_back"
-            android:contentDescription="Back"
-            android:clickable="true"
-            android:focusable="true"
-            android:padding="4dp" />
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:padding="4dp"
+            android:contentDescription="Back" />
 
         <TextView
             android:layout_width="0dp"
@@ -33,32 +35,36 @@
             android:text="Notifications"
             android:textSize="20sp"
             android:textStyle="bold"
-            android:textColor="@color/text_primary"
+            android:textColor="#000000"
+            android:gravity="center"
             android:fontFamily="sans-serif-medium" />
 
-        <TextView
-            android:id="@+id/btn_mark_all_read"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Mark all as read"
-            android:textColor="@color/yellow_accent"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            android:clickable="true"
-            android:focusable="true"
-            android:padding="8dp"
-            android:fontFamily="sans-serif-medium" />
+        <ImageView
+            android:id="@+id/btn_menu"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:src="@drawable/ic_more_vert"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:padding="4dp"
+            android:contentDescription="More options" />
 
     </LinearLayout>
 
-    <!-- Notifications List -->
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/recycler_notifications"
+    <!-- Notifications List with Swipe Refresh -->
+    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+        android:id="@+id/swipe_refresh"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"
-        android:padding="16dp"
-        android:clipToPadding="false" />
+        android:layout_weight="1">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recycler_notifications"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:padding="16dp"
+            android:clipToPadding="false" />
+
+    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
     <!-- Empty State -->
     <LinearLayout

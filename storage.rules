@@ -1,35 +1,33 @@
 rules_version = '2';
-
-// Craft rules based on data in your Firestore database
-// allow write: if firestore.get(
-//    /databases/(default)/documents/users/$(request.auth.uid)).data.isAdmin;
 service firebase.storage {
   match /b/{bucket}/o {
-    // Allow authenticated users to upload images to their own folders
-    match /post_images/{userId}_{timestamp}.jpg {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+    // 🟢 User profile and cover photos
+    match /user_uploads/{userId}/{fileName} {
+      allow read: if true;  // everyone can view profile and cover
+      allow write: if request.auth != null && request.auth.uid == userId;
     }
-    
-    // Allow authenticated users to upload bid images
-    match /bid_images/{allPaths=**} {
+
+    // 🟢 Post and bid images
+    match /post_images/{userId}/{fileName} {
+      allow read: if true;  // all users can view post images
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // 🟢 Chat images - CORRECTED: Match the actual upload path structure
+    match /chat_images/{fileName} {
       allow read, write: if request.auth != null;
     }
-    
-    // Allow authenticated users to upload avatars
-    match /avatars/{userId}.jpg {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+    // 🟢 Chat videos - CORRECTED: Match the actual upload path structure  
+    match /chat_videos/{fileName} {
+      allow read, write: if request.auth != null;
     }
-    
-    // Allow authenticated users to upload cover photos
-    match /covers/{userId}.jpg {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-    }
-    
-    // Allow read access to all images for authenticated users
-    match /{allPaths=**} {
+
+    // 🟢 Notification images (if any)
+    match /notification_images/{userId}/{fileName} {
       allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
     }
   }
 }
-
-

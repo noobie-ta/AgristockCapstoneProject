@@ -1,9 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:background="@color/white">
+    android:background="@color/white"
+    android:fitsSystemWindows="false">
+
+    <!-- Main Content Container -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:background="@color/white">
 
     <!-- Header -->
     <LinearLayout
@@ -11,7 +19,10 @@
         android:layout_height="wrap_content"
         android:background="@color/white"
         android:orientation="horizontal"
-        android:padding="16dp"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="16dp"
+        android:paddingTop="40dp"
         android:gravity="center_vertical"
         android:elevation="4dp">
 
@@ -60,18 +71,104 @@
 
         </LinearLayout>
 
-        <!-- Report Button -->
+        <!-- Mark as Sold Button with Label -->
+        <LinearLayout
+            android:id="@+id/btn_mark_sold"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="12dp"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:padding="4dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:visibility="gone">
+            
+            <ImageView
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:src="@drawable/ic_check_circle"
+                android:contentDescription="Mark as Sold"
+                android:scaleType="centerInside" />
+            
+            <TextView
+                android:id="@+id/tv_mark_sold_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Mark as sold"
+                android:textSize="9sp"
+                android:textColor="@color/text_secondary"
+                android:fontFamily="sans-serif-medium"
+                android:layout_marginTop="2dp" />
+            
+        </LinearLayout>
+
+        <!-- SOLD Chip (shown when item is sold) -->
+        <TextView
+            android:id="@+id/chip_sold"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="12dp"
+            android:text="SOLD"
+            android:textSize="12sp"
+            android:textColor="#D32F2F"
+            android:textStyle="bold"
+            android:fontFamily="sans-serif-medium"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="6dp"
+            android:background="@drawable/chip_sold_background"
+            android:visibility="gone" />
+
+        <!-- Rate Seller Button with Label -->
+        <LinearLayout
+            android:id="@+id/btn_rate_seller"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="12dp"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:padding="4dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:visibility="gone">
+            
+            <ImageView
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:src="@drawable/ic_star_filled"
+                android:contentDescription="Rate Seller"
+                android:scaleType="centerInside"
+                android:tint="@color/yellow_accent" />
+            
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Rate"
+                android:textSize="9sp"
+                android:textColor="@color/text_secondary"
+                android:fontFamily="sans-serif-medium"
+                android:layout_marginTop="2dp" />
+            
+        </LinearLayout>
+
+        <!-- Overflow Menu Button -->
         <ImageView
-            android:id="@+id/btn_report"
+            android:id="@+id/btn_overflow"
             android:layout_width="24dp"
             android:layout_height="24dp"
             android:src="@drawable/ic_more_vert"
             android:tint="@color/text_secondary"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:padding="4dp"
-            android:contentDescription="Report" />
+            android:contentDescription="More options" />
 
     </LinearLayout>
+
+    <!-- Item Info Card -->
+    <include
+        android:id="@+id/item_info_card"
+        layout="@layout/item_info_card"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone" />
 
     <!-- Progress Bar -->
     <ProgressBar
@@ -81,6 +178,43 @@
         android:layout_gravity="center"
         android:layout_marginTop="32dp"
         android:visibility="gone" />
+
+    <!-- Upload Progress -->
+    <LinearLayout
+        android:id="@+id/ll_upload_progress"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="@color/background_secondary"
+        android:padding="12dp"
+        android:gravity="center_vertical"
+        android:visibility="gone"
+        android:layout_margin="8dp"
+        android:elevation="4dp">
+
+        <ProgressBar
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:layout_marginEnd="12dp" />
+
+        <TextView
+            android:id="@+id/tv_upload_status"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Uploading..."
+            android:textColor="@color/text_primary"
+            android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/tv_upload_percentage"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="0%"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp" />
+
+    </LinearLayout>
 
     <!-- Messages List -->
     <androidx.recyclerview.widget.RecyclerView
@@ -129,6 +263,60 @@
 
     </LinearLayout>
 
+    <!-- Image Preview -->
+    <LinearLayout
+        android:id="@+id/ll_image_preview"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="16dp"
+        android:background="@color/background_secondary"
+        android:visibility="gone">
+
+        <ImageView
+            android:id="@+id/iv_image_preview"
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:scaleType="centerCrop"
+            android:background="@color/gray_100"
+            android:layout_marginEnd="12dp" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Image selected"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tv_image_name"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="image.jpg"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp" />
+
+        </LinearLayout>
+
+        <ImageView
+            android:id="@+id/btn_remove_image"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_close"
+            android:tint="@color/text_secondary"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:padding="4dp" />
+
+    </LinearLayout>
+
     <!-- Message Input -->
     <LinearLayout
         android:layout_width="match_parent"
@@ -160,8 +348,9 @@
             android:textColorHint="@color/text_secondary"
             android:textSize="14sp"
             android:maxLines="3"
-            android:inputType="textMultiLine"
-            android:imeOptions="actionSend" />
+            android:inputType="textCapSentences|textMultiLine"
+            android:imeOptions="actionSend"
+            android:scrollHorizontally="false" />
 
         <ImageView
             android:id="@+id/btn_send"
@@ -177,6 +366,8 @@
 
     </LinearLayout>
 
-</LinearLayout>
+    </LinearLayout>
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>
 
 

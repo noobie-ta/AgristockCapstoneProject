@@ -12,7 +12,10 @@
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:background="@color/white"
-        android:padding="12dp">
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:paddingBottom="12dp"
+        android:paddingTop="36dp">
 
         <!-- Top Row: Back Button Only -->
         <LinearLayout
@@ -95,7 +98,7 @@
 
     </LinearLayout>
 
-    <!-- Recent & Suggested Searches -->
+    <!-- Recent &amp; Suggested Searches -->
     <ScrollView
         android:id="@+id/ll_recent_searches"
         android:layout_width="match_parent"

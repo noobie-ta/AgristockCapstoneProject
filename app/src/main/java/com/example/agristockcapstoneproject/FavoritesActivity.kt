@@ -31,6 +31,7 @@ class FavoritesActivity : AppCompatActivity() {
     private lateinit var emptyState: LinearLayout
     private lateinit var browseButton: TextView
     private val items = mutableListOf<FavoriteItem>()
+    private val loadedPostIds = mutableSetOf<String>() // Track already loaded post IDs to prevent duplicates
 
     private val auth: FirebaseAuth by lazy { FirebaseAuth.getInstance() }
     private val firestore: FirebaseFirestore by lazy { FirebaseFirestore.getInstance() }
@@ -40,6 +41,9 @@ class FavoritesActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_favorites)
+
+        // Configure status bar - transparent to show phone status
+        com.example.agristockcapstoneproject.utils.StatusBarUtil.makeTransparent(this, lightIcons = true)
 
         findViewById<ImageView>(R.id.btn_back).setOnClickListener { finish() }
         recyclerView = findViewById(R.id.rv_favorites)
@@ -61,7 +65,7 @@ class FavoritesActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        loadFavorites()
+        // Real-time listener handles updates, no need to reload here
     }
 
     override fun onStart() {
@@ -87,8 +91,31 @@ class FavoritesActivity : AppCompatActivity() {
             .get()
             .addOnSuccessListener { qs ->
                 items.clear()
+                loadedPostIds.clear()
+                
+                val totalDocs = qs.documents.size
+                if (totalDocs == 0) {
+                    showEmpty()
+                    return@addOnSuccessListener
+                }
+                
+                var loadedCount = 0
+                
                 for (doc in qs.documents) {
                     val postId = doc.getString("postId") ?: doc.id
+                    
+                    // Skip if already loaded to prevent duplicates
+                    if (loadedPostIds.contains(postId)) {
+                        loadedCount++
+                        if (loadedCount == totalDocs) {
+                            recyclerView.adapter?.notifyDataSetChanged()
+                            if (items.isEmpty()) showEmpty() else showList()
+                        }
+                        continue
+                    }
+                    
+                    loadedPostIds.add(postId)
+                    
                     // Fetch post type from the original post document
                     firestore.collection("posts").document(postId)
                         .get()
@@ -104,8 +131,12 @@ class FavoritesActivity : AppCompatActivity() {
                                     type = postType
                                 )
                             )
-                            recyclerView.adapter?.notifyDataSetChanged()
-                            if (items.isEmpty()) showEmpty() else showList()
+                            loadedCount++
+                            // Only notify once all posts are loaded
+                            if (loadedCount == totalDocs) {
+                                recyclerView.adapter?.notifyDataSetChanged()
+                                if (items.isEmpty()) showEmpty() else showList()
+                            }
                         }
                         .addOnFailureListener {
                             // If we can't get the post type, default to SELL
@@ -119,8 +150,12 @@ class FavoritesActivity : AppCompatActivity() {
                                     type = "SELL"
                                 )
                             )
-                            recyclerView.adapter?.notifyDataSetChanged()
-                            if (items.isEmpty()) showEmpty() else showList()
+                            loadedCount++
+                            // Only notify once all posts are loaded
+                            if (loadedCount == totalDocs) {
+                                recyclerView.adapter?.notifyDataSetChanged()
+                                if (items.isEmpty()) showEmpty() else showList()
+                            }
                         }
                 }
             }
@@ -211,8 +246,9 @@ class FavoritesActivity : AppCompatActivity() {
         try {
             if (index != -1 && index < items.size) {
                 val removedItem = items.removeAt(index)
-                // Remove from tracking set
+                // Remove from tracking sets
                 removingItems.remove(removedItem.id)
+                loadedPostIds.remove(removedItem.id)
                 // Notify adapter of the change
                 recyclerView.adapter?.notifyItemRemoved(index)
                 // Also notify that the data set has changed to ensure consistency
@@ -299,16 +335,26 @@ class FavoritesActivity : AppCompatActivity() {
                 }
                 
                 items.clear()
+                loadedPostIds.clear()
+                
                 snapshot?.documents?.forEach { doc ->
-                    items.add(
-                        FavoriteItem(
-                            id = doc.getString("postId") ?: doc.id,
-                            title = doc.getString("title") ?: "",
-                            price = doc.getString("price") ?: "",
-                            imageUrl = doc.getString("imageUrl"),
-                            date = doc.getString("date") ?: ""
+                    val postId = doc.getString("postId") ?: doc.id
+                    
+                    // Skip if already added to prevent duplicates
+                    if (!loadedPostIds.contains(postId)) {
+                        loadedPostIds.add(postId)
+                        
+                        items.add(
+                            FavoriteItem(
+                                id = postId,
+                                title = doc.getString("title") ?: "",
+                                price = doc.getString("price") ?: "",
+                                imageUrl = doc.getString("imageUrl"),
+                                date = doc.getString("date") ?: "",
+                                type = "SELL" // Default type for listener, will be updated if needed
+                            )
                         )
-                    )
+                    }
                 }
                 recyclerView.adapter?.notifyDataSetChanged()
                 if (items.isEmpty()) showEmpty() else showList()

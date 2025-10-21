@@ -23,7 +23,9 @@ class ViewUserProfileActivity : AppCompatActivity() {
         val status: String, // FOR SALE or BIDDING or SOLD
         val datePosted: String,
         val favoriteCount: Long = 0L,
-        val type: String = "SELL" // SELL or BID
+        val type: String = "SELL", // SELL or BID
+        val saleTradeType: String = "SALE", // SALE, TRADE, or BOTH
+        val category: String = ""
     )
 
     // Profile Section Views
@@ -235,11 +237,11 @@ class ViewUserProfileActivity : AppCompatActivity() {
 
     private fun updateRatingDisplay(rating: Float, totalRatings: Int = 0) {
         // Update rating text with total ratings count
-        if (totalRatings > 0) {
+        if (totalRatings > 0 && rating > 0) {
             tvRatingText.text = String.format("%.1f", rating)
             tvTotalRatings.text = "$totalRatings ratings"
         } else {
-            tvRatingText.text = "No ratings"
+            tvRatingText.text = ""
             tvTotalRatings.text = "0 ratings"
         }
         
@@ -289,7 +291,9 @@ class ViewUserProfileActivity : AppCompatActivity() {
                             status = d.getString("status") ?: "FOR SALE",
                             datePosted = d.getString("datePosted") ?: "Unknown date",
                             favoriteCount = d.getLong("favoriteCount") ?: 0L,
-                            type = d.getString("type") ?: "SELL"
+                            type = d.getString("type") ?: "SELL",
+                            saleTradeType = d.getString("saleTradeType") ?: "SALE",
+                            category = d.getString("category") ?: ""
                         )
                     }
                     // Filter out SOLD items client-side to avoid Firestore '!=' constraints
@@ -379,9 +383,27 @@ class ViewUserProfileActivity : AppCompatActivity() {
         val tvFavCount = postView.findViewById<TextView>(R.id.tv_favorite_count)
         val btnView = postView.findViewById<TextView>(R.id.btn_view_post)
         
+        // Category and Sale/Trade badges (for list view)
+        val tvCategoryBadge = postView.findViewById<TextView>(R.id.tv_category_badge)
+        val tvSaleTradeBadge = postView.findViewById<TextView>(R.id.tv_sale_trade_badge)
+        
         tvName.text = post.name
         tvPrice.text = formatPrice(post.price)
         tvTime.text = post.datePosted
+        
+        // Set category and sale/trade type badges
+        if (tvCategoryBadge != null) {
+            tvCategoryBadge.text = post.category.uppercase()
+        }
+        if (tvSaleTradeBadge != null) {
+            val saleTradeText = when (post.saleTradeType.uppercase()) {
+                "SALE" -> "SALE"
+                "TRADE" -> "TRADE"
+                "BOTH" -> "SALE/TRADE"
+                else -> "SALE"
+            }
+            tvSaleTradeBadge.text = saleTradeText
+        }
         
         btnView.setOnClickListener {
             val intent = if (post.type == "BID") {
@@ -402,6 +424,7 @@ class ViewUserProfileActivity : AppCompatActivity() {
             // Load image from the post data
             val imageUrl = doc.getString("imageUrl") ?: 
                 (doc.get("imageUrls") as? List<*>)?.firstOrNull()?.toString()
+            val imageUrls = doc.get("imageUrls") as? List<String> ?: emptyList()
             
             if (!imageUrl.isNullOrEmpty()) {
                 Glide.with(this)
@@ -410,6 +433,18 @@ class ViewUserProfileActivity : AppCompatActivity() {
                     .placeholder(R.drawable.ic_image_placeholder)
                     .error(R.drawable.ic_image_placeholder)
                     .into(ivPostImage)
+                
+                // Make image clickable for image viewer (works for single or multiple images)
+                ivPostImage.setOnClickListener {
+                    val imageUrlList = if (imageUrls.isNotEmpty()) {
+                        imageUrls.filter { it.isNotEmpty() }
+                    } else {
+                        listOf(imageUrl).filter { it.isNotEmpty() }
+                    }
+                    if (imageUrlList.isNotEmpty()) {
+                        ImageViewerActivity.start(this, imageUrlList, 0)
+                    }
+                }
             } else {
                 ivPostImage.setImageResource(R.drawable.ic_image_placeholder)
             }
@@ -422,14 +457,33 @@ class ViewUserProfileActivity : AppCompatActivity() {
         postsContainer.addView(postView)
     }
 
+
     private fun setupPostItem(itemView: View, post: PostItem) {
         val tvName = itemView.findViewById<TextView>(R.id.tv_post_name)
         val tvPrice = itemView.findViewById<TextView>(R.id.tv_post_price)
         val ivPostImage = itemView.findViewById<ImageView>(R.id.iv_post_image)
         val tvFavCount = itemView.findViewById<TextView>(R.id.tv_favorites_count)
         
+        // Category and Sale/Trade badges (for grid view)
+        val tvCategoryBadge = itemView.findViewById<TextView>(R.id.tv_category_badge)
+        val tvSaleTradeBadge = itemView.findViewById<TextView>(R.id.tv_sale_trade_badge)
+        
         tvName.text = post.name
         tvPrice.text = formatPrice(post.price)
+        
+        // Set category and sale/trade type badges
+        if (tvCategoryBadge != null) {
+            tvCategoryBadge.text = post.category.uppercase()
+        }
+        if (tvSaleTradeBadge != null) {
+            val saleTradeText = when (post.saleTradeType.uppercase()) {
+                "SALE" -> "SALE"
+                "TRADE" -> "TRADE"
+                "BOTH" -> "SALE/TRADE"
+                else -> "SALE"
+            }
+            tvSaleTradeBadge.text = saleTradeText
+        }
         
         // Load image and favorite count
         val postRef = firestore.collection("posts").document(post.id)
@@ -441,6 +495,7 @@ class ViewUserProfileActivity : AppCompatActivity() {
                 // Load image from the post data
                 val imageUrl = doc.getString("imageUrl") ?: 
                     (doc.get("imageUrls") as? List<*>)?.firstOrNull()?.toString()
+                val imageUrls = doc.get("imageUrls") as? List<String> ?: emptyList()
                 
                 if (!imageUrl.isNullOrEmpty()) {
                     Glide.with(this)
@@ -449,6 +504,14 @@ class ViewUserProfileActivity : AppCompatActivity() {
                         .placeholder(R.drawable.ic_image_placeholder)
                         .error(R.drawable.ic_image_placeholder)
                         .into(ivPostImage)
+                    
+                    // Make image clickable for multiple image viewer
+                    ivPostImage.setOnClickListener {
+                        val imageUrlList = imageUrls.mapNotNull { it?.toString() }.filter { it.isNotEmpty() }
+                        if (imageUrlList.isNotEmpty()) {
+                            ImageViewerActivity.start(this, imageUrlList, 0)
+                        }
+                    }
                 } else {
                     ivPostImage.setImageResource(R.drawable.ic_image_placeholder)
                 }
@@ -497,98 +560,183 @@ class ViewUserProfileActivity : AppCompatActivity() {
     }
     
     private fun createOrFindChat(userId: String) {
-        val currentUserId = auth.currentUser?.uid ?: return
+        val currentUserId = auth.currentUser?.uid
+        if (currentUserId == null) {
+            Toast.makeText(this, "Please log in to send a message", Toast.LENGTH_SHORT).show()
+            return
+        }
         
-        // Check if chat already exists between these users
-        firestore.collection("chats")
-            .whereArrayContains("participants", currentUserId)
-            .get()
-            .addOnSuccessListener { chatsSnapshot ->
-                var existingChatId: String? = null
-                
-                // Look for existing chat with the user
-                for (chatDoc in chatsSnapshot.documents) {
-                    val participants = chatDoc.get("participants") as? List<String>
-                    if (participants != null && participants.contains(userId)) {
-                        existingChatId = chatDoc.id
-                        break
+        try {
+            // Check if chat already exists between these users
+            firestore.collection("chats")
+                .whereArrayContains("participants", currentUserId)
+                .get()
+                .addOnSuccessListener { chatsSnapshot ->
+                    try {
+                        var existingChatId: String? = null
+                        
+                        // Look for existing chat with the user
+                        for (chatDoc in chatsSnapshot.documents) {
+                            val participants = chatDoc.get("participants") as? List<String>
+                            if (participants != null && participants.contains(userId)) {
+                                existingChatId = chatDoc.id
+                                break
+                            }
+                        }
+                        
+                        if (existingChatId != null) {
+                            // Chat exists, navigate to it
+                            navigateToChat(existingChatId, userId)
+                        } else {
+                            // Create new chat
+                            createNewChat(userId)
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.e("ViewUserProfileActivity", "Error processing chat query: ${e.message}")
+                        createNewChat(userId)
                     }
                 }
-                
-                if (existingChatId != null) {
-                    // Chat exists, navigate to it
-                    navigateToChat(existingChatId, userId)
-                } else {
-                    // Create new chat
+                .addOnFailureListener { exception ->
+                    android.util.Log.e("ViewUserProfileActivity", "Error querying chats: ${exception.message}")
+                    Toast.makeText(this, "Failed to check existing chats", Toast.LENGTH_SHORT).show()
                     createNewChat(userId)
                 }
-            }
-            .addOnFailureListener {
-                Toast.makeText(this, "Failed to check existing chats", Toast.LENGTH_SHORT).show()
-            }
+        } catch (e: Exception) {
+            android.util.Log.e("ViewUserProfileActivity", "Error in createOrFindChat: ${e.message}")
+            Toast.makeText(this, "Error creating chat: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
     }
     
     private fun createNewChat(userId: String) {
-        val currentUserId = auth.currentUser?.uid ?: return
+        val currentUserId = auth.currentUser?.uid
+        if (currentUserId == null) {
+            Toast.makeText(this, "Please log in to send a message", Toast.LENGTH_SHORT).show()
+            return
+        }
         
-        // Get user's information for the chat
-        firestore.collection("users").document(userId)
-            .get()
-            .addOnSuccessListener { userDoc ->
-                val userName = if (userDoc.exists()) {
-                    userDoc.getString("username") ?: 
-                    "${userDoc.getString("firstName") ?: ""} ${userDoc.getString("lastName") ?: ""}".trim()
-                        .ifEmpty { userDoc.getString("displayName") ?: "User" }
-                } else {
-                    "User"
+        try {
+            // Get user's information for the chat
+            firestore.collection("users").document(userId)
+                .get()
+                .addOnSuccessListener { userDoc ->
+                    try {
+                        val userName = if (userDoc.exists()) {
+                            userDoc.getString("username") ?: 
+                            "${userDoc.getString("firstName") ?: ""} ${userDoc.getString("lastName") ?: ""}".trim()
+                                .ifEmpty { userDoc.getString("displayName") ?: "User" }
+                        } else {
+                            "User"
+                        }
+                        
+                        val userAvatar = userDoc.getString("avatarUrl")
+                        
+                        android.util.Log.d("ViewUserProfileActivity", "Retrieved user data - userName: $userName, userAvatar: $userAvatar")
+                        
+                        // Create new chat document
+                        val chatData = hashMapOf(
+                            "participants" to listOf(currentUserId, userId),
+                            "lastMessage" to "",
+                            "lastMessageTime" to System.currentTimeMillis(),
+                            "lastMessageSender" to "",
+                            "createdAt" to com.google.firebase.Timestamp.now(),
+                            "unreadCount_$currentUserId" to 0,
+                            "unreadCount_$userId" to 0
+                        )
+                        
+                        firestore.collection("chats")
+                            .add(chatData)
+                            .addOnSuccessListener { chatDoc ->
+                                navigateToChat(chatDoc.id, userId, userName, userAvatar)
+                            }
+                            .addOnFailureListener { exception ->
+                                android.util.Log.e("ViewUserProfileActivity", "Error creating chat: ${exception.message}")
+                                Toast.makeText(this, "Failed to create chat: ${exception.message}", Toast.LENGTH_SHORT).show()
+                            }
+                    } catch (e: Exception) {
+                        android.util.Log.e("ViewUserProfileActivity", "Error processing user data: ${e.message}")
+                        createChatWithMinimalInfo(currentUserId, userId)
+                    }
                 }
-                
-                val userAvatar = userDoc.getString("avatarUrl")
-                
-                // Create new chat document
-                val chatData = hashMapOf(
-                    "participants" to listOf(currentUserId, userId),
-                    "lastMessage" to "",
-                    "lastMessageTime" to System.currentTimeMillis(),
-                    "lastMessageSender" to "",
-                    "createdAt" to com.google.firebase.Timestamp.now(),
-                    "unreadCount_$currentUserId" to 0,
-                    "unreadCount_$userId" to 0
-                )
-                
-                firestore.collection("chats")
-                    .add(chatData)
-                    .addOnSuccessListener { chatDoc ->
-                        navigateToChat(chatDoc.id, userId, userName, userAvatar)
+                .addOnFailureListener { exception ->
+                    android.util.Log.e("ViewUserProfileActivity", "Error loading user data: ${exception.message}")
+                    // Create chat with minimal info if user data can't be loaded
+                    createChatWithMinimalInfo(currentUserId, userId)
+                }
+        } catch (e: Exception) {
+            android.util.Log.e("ViewUserProfileActivity", "Error in createNewChat: ${e.message}")
+            Toast.makeText(this, "Error creating chat: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
+    
+    private fun createChatWithMinimalInfo(currentUserId: String, userId: String) {
+        try {
+            val chatData = hashMapOf(
+                "participants" to listOf(currentUserId, userId),
+                "lastMessage" to "",
+                "lastMessageTime" to System.currentTimeMillis(),
+                "lastMessageSender" to "",
+                "createdAt" to com.google.firebase.Timestamp.now(),
+                "unreadCount_$currentUserId" to 0,
+                "unreadCount_$userId" to 0
+            )
+            
+            firestore.collection("chats")
+                .add(chatData)
+                .addOnSuccessListener { chatDoc ->
+                    // Load user data before navigating to ensure we have userName and userAvatar
+                    loadUserDataForChat(chatDoc.id, userId)
+                }
+                .addOnFailureListener { exception ->
+                    android.util.Log.e("ViewUserProfileActivity", "Error creating minimal chat: ${exception.message}")
+                    Toast.makeText(this, "Failed to create chat: ${exception.message}", Toast.LENGTH_SHORT).show()
+                }
+        } catch (e: Exception) {
+            android.util.Log.e("ViewUserProfileActivity", "Error in createChatWithMinimalInfo: ${e.message}")
+            Toast.makeText(this, "Error creating chat: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
+    
+    private fun loadUserDataForChat(chatId: String, userId: String) {
+        try {
+            firestore.collection("users").document(userId)
+                .get()
+                .addOnSuccessListener { userDoc ->
+                    try {
+                        val userName = if (userDoc.exists()) {
+                            userDoc.getString("username") ?: 
+                            "${userDoc.getString("firstName") ?: ""} ${userDoc.getString("lastName") ?: ""}".trim()
+                                .ifEmpty { userDoc.getString("displayName") ?: "User" }
+                        } else {
+                            "User"
+                        }
+                        
+                        val userAvatar = userDoc.getString("avatarUrl")
+                        
+                        android.util.Log.d("ViewUserProfileActivity", "Loaded user data for chat - userName: $userName, userAvatar: $userAvatar")
+                        
+                        // Navigate to chat with complete user data
+                        navigateToChat(chatId, userId, userName, userAvatar)
+                    } catch (e: Exception) {
+                        android.util.Log.e("ViewUserProfileActivity", "Error processing user data for chat: ${e.message}")
+                        // Navigate with minimal data as fallback
+                        navigateToChat(chatId, userId, "User", null)
                     }
-                    .addOnFailureListener {
-                        Toast.makeText(this, "Failed to create chat", Toast.LENGTH_SHORT).show()
-                    }
-            }
-            .addOnFailureListener {
-                // Create chat with minimal info if user data can't be loaded
-                val chatData = hashMapOf(
-                    "participants" to listOf(currentUserId, userId),
-                    "lastMessage" to "",
-                    "lastMessageTime" to System.currentTimeMillis(),
-                    "lastMessageSender" to "",
-                    "createdAt" to com.google.firebase.Timestamp.now(),
-                    "unreadCount_$currentUserId" to 0,
-                    "unreadCount_$userId" to 0
-                )
-                
-                firestore.collection("chats")
-                    .add(chatData)
-                    .addOnSuccessListener { chatDoc ->
-                        navigateToChat(chatDoc.id, userId)
-                    }
-                    .addOnFailureListener {
-                        Toast.makeText(this, "Failed to create chat", Toast.LENGTH_SHORT).show()
-                    }
-            }
+                }
+                .addOnFailureListener { exception ->
+                    android.util.Log.e("ViewUserProfileActivity", "Error loading user data for chat: ${exception.message}")
+                    // Navigate with minimal data as fallback
+                    navigateToChat(chatId, userId, "User", null)
+                }
+        } catch (e: Exception) {
+            android.util.Log.e("ViewUserProfileActivity", "Error in loadUserDataForChat: ${e.message}")
+            // Navigate with minimal data as fallback
+            navigateToChat(chatId, userId, "User", null)
+        }
     }
     
     private fun navigateToChat(chatId: String, userId: String, userName: String = "", userAvatar: String? = null) {
+        android.util.Log.d("ViewUserProfileActivity", "Navigating to chat - chatId: $chatId, userId: $userId, userName: $userName, userAvatar: $userAvatar")
+        
         val intent = Intent(this, ChatRoomActivity::class.java)
         intent.putExtra("chatId", chatId)
         intent.putExtra("otherUserId", userId)

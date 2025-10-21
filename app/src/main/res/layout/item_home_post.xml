@@ -15,6 +15,8 @@
         android:scaleType="centerCrop"
         android:background="@color/gray_100"
         android:contentDescription="Item image"
+        android:clickable="true"
+        android:focusable="true"
         android:layout_marginBottom="8dp" />
 
     <!-- Product Info -->
@@ -52,14 +54,77 @@
                 android:fontFamily="sans-serif-medium"
                 android:layout_marginBottom="2dp" />
 
-            <TextView
-                android:id="@+id/tv_post_time"
+
+            <!-- Category and Sale/Trade Type -->
+            <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Just now"
-                android:textColor="@color/text_secondary"
-                android:textSize="11sp"
-                android:fontFamily="sans-serif" />
+                android:orientation="horizontal"
+                android:layout_marginTop="2dp">
+
+                <TextView
+                    android:id="@+id/tv_category_badge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/badge_sell"
+                    android:paddingHorizontal="6dp"
+                    android:paddingVertical="2dp"
+                    android:text="CATEGORY"
+                    android:textAllCaps="true"
+                    android:textColor="@color/white"
+                    android:textSize="8sp"
+                    android:textStyle="bold"
+                    android:fontFamily="sans-serif-medium" />
+
+                <TextView
+                    android:id="@+id/tv_sale_trade_badge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:background="@drawable/status_chip_sale_trade"
+                    android:paddingHorizontal="6dp"
+                    android:paddingVertical="2dp"
+                    android:text="SALE"
+                    android:textAllCaps="true"
+                    android:textColor="@color/white"
+                    android:textSize="8sp"
+                    android:textStyle="bold"
+                    android:fontFamily="sans-serif-medium" />
+
+                <TextView
+                    android:id="@+id/tv_bid_badge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:background="@drawable/status_chip_bid"
+                    android:paddingHorizontal="6dp"
+                    android:paddingVertical="2dp"
+                    android:text="BID"
+                    android:textAllCaps="true"
+                    android:textColor="@color/white"
+                    android:textSize="8sp"
+                    android:textStyle="bold"
+                    android:fontFamily="sans-serif-medium"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/tv_sold_badge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:background="@drawable/badge_sold"
+                    android:paddingHorizontal="8dp"
+                    android:paddingVertical="2dp"
+                    android:text="SOLD"
+                    android:textAllCaps="true"
+                    android:textColor="@color/white"
+                    android:textSize="8sp"
+                    android:textStyle="bold"
+                    android:fontFamily="sans-serif-medium"
+                    android:visibility="gone" />
+
+            </LinearLayout>
+
 
         </LinearLayout>
 
