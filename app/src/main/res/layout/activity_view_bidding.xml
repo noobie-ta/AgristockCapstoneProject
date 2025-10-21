@@ -51,14 +51,51 @@
 
         </LinearLayout>
 
-        <!-- Item Image -->
-        <ImageView
-            android:id="@+id/iv_item_image"
+        <!-- Item Image with Indicators -->
+        <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="250dp"
-            android:scaleType="centerCrop"
-            android:background="#E0E0E0"
-            android:src="@drawable/ic_image_placeholder" />
+            android:layout_height="250dp">
+
+            <ImageView
+                android:id="@+id/iv_item_image"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop"
+                android:background="#E0E0E0"
+                android:src="@drawable/ic_image_placeholder"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <!-- Image Count Indicator -->
+            <TextView
+                android:id="@+id/tv_image_count"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="top|end"
+                android:layout_margin="12dp"
+                android:background="@drawable/circle_white_background"
+                android:padding="8dp"
+                android:text="+2"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+
+            <!-- Multiple Images Indicator -->
+            <LinearLayout
+                android:id="@+id/ll_image_indicators"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom|center_horizontal"
+                android:layout_margin="12dp"
+                android:orientation="horizontal"
+                android:visibility="gone">
+
+                <!-- Indicators will be added dynamically -->
+
+            </LinearLayout>
+
+        </FrameLayout>
 
         <!-- Item Details -->
         <LinearLayout
@@ -138,6 +175,50 @@
                 android:text="Item description goes here..."
                 android:textColor="@color/black"
                 android:textSize="16sp" />
+
+            <!-- Location Section -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="16dp"
+                android:padding="12dp"
+                android:background="@drawable/location_background"
+                android:gravity="center_vertical">
+
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_location_pin"
+                    android:tint="@color/button_bid_text"
+                    android:layout_marginEnd="8dp" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Location"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tv_item_location"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Location not specified"
+                        android:textColor="@color/text_primary"
+                        android:textSize="14sp"
+                        android:layout_marginTop="2dp" />
+
+                </LinearLayout>
+
+            </LinearLayout>
 
         </LinearLayout>
 

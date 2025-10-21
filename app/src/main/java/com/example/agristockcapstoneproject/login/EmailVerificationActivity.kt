@@ -24,7 +24,7 @@ class EmailVerificationActivity : AppCompatActivity() {
     private var phone: String = ""
     private var password: String = ""
     private var resendTimer: CountDownTimer? = null
-    private val resendCooldownMs: Long = 120_000L
+    private val resendCooldownMs: Long = 120_000L // 2 minutes cooldown
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -43,9 +43,8 @@ class EmailVerificationActivity : AppCompatActivity() {
 
         binding.tvEmailMessage.text = "We sent a verification link to your email.\nTap the link, then press Done."
 
-        // Create account immediately and send verification, then start cooldown
-        createUserAccount()
-        startResendCooldown()
+        // Setup existing user and send verification, then start cooldown
+        setupExistingUser()
 
         setupClickListeners()
     }
@@ -63,62 +62,142 @@ class EmailVerificationActivity : AppCompatActivity() {
     }
 
     private fun sendEmailVerificationAgain() {
-        auth.currentUser?.sendEmailVerification()
-            ?.addOnSuccessListener { 
-                Toast.makeText(this, "Verification email sent", Toast.LENGTH_SHORT).show()
-                startResendCooldown()
+        val user = auth.currentUser
+        if (user == null) {
+            Toast.makeText(this, "No user account found", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        // Check if user is already verified
+        user.reload().addOnCompleteListener { reloadTask ->
+            if (reloadTask.isSuccessful && user.isEmailVerified) {
+                Toast.makeText(this, "Email is already verified", Toast.LENGTH_SHORT).show()
+                return@addOnCompleteListener
             }
-            ?.addOnFailureListener { 
-                Toast.makeText(this, it.message ?: "Failed to send email", Toast.LENGTH_SHORT).show() 
-            }
-    }
 
-    private fun createUserAccount() {
-        binding.btnSubmit.isEnabled = false
-        binding.btnSubmit.text = "Verifying..."
-
-        auth.createUserWithEmailAndPassword(userEmail, password)
-            .addOnCompleteListener(this) { task ->
-                if (task.isSuccessful) {
-                    Log.d("EmailVerificationActivity", "createUserWithEmail:success")
-                    val user = auth.currentUser
-
-                    // Update user profile with display name
-                    val profileUpdates = UserProfileChangeRequest.Builder()
-                        .setDisplayName("$firstName $lastName")
-                        .build()
-
-                    user?.updateProfile(profileUpdates)?.addOnCompleteListener { profileTask ->
-                        if (profileTask.isSuccessful) {
-                            // Send email verification and start cooldown
-                            user.sendEmailVerification()
-                                .addOnSuccessListener {
-                                    startResendCooldown()
-                                    binding.btnSubmit.isEnabled = true
-                                    binding.btnSubmit.text = "Done"
-                                }
-                                .addOnFailureListener {
-                                    binding.btnSubmit.isEnabled = true
-                                    binding.btnSubmit.text = "Done"
-                                }
-                        } else {
-                            Log.w("EmailVerificationActivity", "Failed to update profile")
-                            user.sendEmailVerification()
-                                .addOnCompleteListener { 
-                                    startResendCooldown()
-                                    binding.btnSubmit.isEnabled = true
-                                    binding.btnSubmit.text = "Done" 
-                                }
+            // Send verification email with proper error handling
+            user.sendEmailVerification()
+                .addOnSuccessListener { 
+                    Toast.makeText(this, "Verification email sent to $userEmail", Toast.LENGTH_SHORT).show()
+                    startResendCooldown()
+                }
+                .addOnFailureListener { e ->
+                    Log.w("EmailVerificationActivity", "Failed to send verification email", e)
+                    
+                    // Only show specific error messages for actual blocking issues
+                    val errorMessage = when {
+                        e.message?.contains("blocked", ignoreCase = true) == true -> {
+                            "Email sending is temporarily blocked. Please wait 15-30 minutes before trying again."
+                        }
+                        e.message?.contains("rate", ignoreCase = true) == true -> {
+                            "Rate limit exceeded. Please wait 5-10 minutes before requesting another email."
+                        }
+                        e.message?.contains("quota", ignoreCase = true) == true -> {
+                            "Email quota exceeded. Please try again later."
+                        }
+                        e.message?.contains("too many", ignoreCase = true) == true -> {
+                            "Too many requests. Please wait 15-30 minutes before trying again."
+                        }
+                        e.message?.contains("invalid", ignoreCase = true) == true -> {
+                            "Invalid email address. Please check your email and try again."
+                        }
+                        e.message?.contains("network", ignoreCase = true) == true -> {
+                            "Network error. Please check your internet connection and try again."
+                        }
+                        else -> {
+                            "Failed to send verification email. Please try again later."
                         }
                     }
-                } else {
-                    binding.btnSubmit.isEnabled = true
-                    binding.btnSubmit.text = "Done"
-                    Log.w("EmailVerificationActivity", "createUserWithEmail:failure", task.exception)
-                    Toast.makeText(this, "Account creation failed: ${task.exception?.message}",
-                        Toast.LENGTH_LONG).show()
+                    
+                    Toast.makeText(this, errorMessage, Toast.LENGTH_LONG).show()
+                    
+                    // Only show alternative options for actual blocking errors
+                    if (e.message?.contains("blocked", ignoreCase = true) == true || 
+                        e.message?.contains("rate", ignoreCase = true) == true ||
+                        e.message?.contains("quota", ignoreCase = true) == true ||
+                        e.message?.contains("too many", ignoreCase = true) == true) {
+                        showAlternativeOptions()
+                    }
                 }
+        }
+    }
+
+    private fun setupExistingUser() {
+        binding.btnSubmit.isEnabled = false
+        binding.btnSubmit.text = "Setting up..."
+
+        val user = auth.currentUser
+        if (user != null) {
+            Log.d("EmailVerificationActivity", "User already exists, setting up profile")
+            
+            // Update user profile with display name
+            val profileUpdates = UserProfileChangeRequest.Builder()
+                .setDisplayName("$firstName $lastName")
+                .build()
+
+            user.updateProfile(profileUpdates).addOnCompleteListener { profileTask ->
+                if (profileTask.isSuccessful) {
+                    Log.d("EmailVerificationActivity", "Profile updated successfully")
+                } else {
+                    Log.w("EmailVerificationActivity", "Failed to update profile")
+                }
+                
+                // Send email verification and start cooldown
+                user.sendEmailVerification()
+                    .addOnSuccessListener {
+                        Log.d("EmailVerificationActivity", "Verification email sent successfully")
+                        Toast.makeText(this, "Verification email sent to $userEmail", Toast.LENGTH_SHORT).show()
+                        startResendCooldown()
+                        binding.btnSubmit.isEnabled = true
+                        binding.btnSubmit.text = "Done"
+                    }
+                    .addOnFailureListener { e ->
+                        Log.w("EmailVerificationActivity", "Failed to send verification email", e)
+                        
+                        // Only show specific error messages for actual blocking issues
+                        val errorMessage = when {
+                            e.message?.contains("blocked", ignoreCase = true) == true -> {
+                                "Email sending is temporarily blocked. Please wait 15-30 minutes before trying again."
+                            }
+                            e.message?.contains("rate", ignoreCase = true) == true -> {
+                                "Rate limit exceeded. Please wait 5-10 minutes before requesting another email."
+                            }
+                            e.message?.contains("quota", ignoreCase = true) == true -> {
+                                "Email quota exceeded. Please try again later."
+                            }
+                            e.message?.contains("too many", ignoreCase = true) == true -> {
+                                "Too many requests. Please wait 15-30 minutes before trying again."
+                            }
+                            e.message?.contains("invalid", ignoreCase = true) == true -> {
+                                "Invalid email address. Please check your email and try again."
+                            }
+                            e.message?.contains("network", ignoreCase = true) == true -> {
+                                "Network error. Please check your internet connection and try again."
+                            }
+                            else -> {
+                                "Failed to send verification email. Please try again later."
+                            }
+                        }
+                        
+                        Toast.makeText(this, errorMessage, Toast.LENGTH_LONG).show()
+                        startResendCooldown()
+                        binding.btnSubmit.isEnabled = true
+                        binding.btnSubmit.text = "Done"
+                        
+                        // Only show alternative options for actual blocking errors
+                        if (e.message?.contains("blocked", ignoreCase = true) == true || 
+                            e.message?.contains("rate", ignoreCase = true) == true ||
+                            e.message?.contains("quota", ignoreCase = true) == true ||
+                            e.message?.contains("too many", ignoreCase = true) == true) {
+                            showAlternativeOptions()
+                        }
+                    }
             }
+        } else {
+            Log.e("EmailVerificationActivity", "No current user found")
+            Toast.makeText(this, "No user account found. Please try signing up again.", Toast.LENGTH_LONG).show()
+            finish()
+        }
     }
 
     private fun checkEmailVerificationAndProceed() {
@@ -135,7 +214,7 @@ class EmailVerificationActivity : AppCompatActivity() {
             if (reloadTask.isSuccessful && user.isEmailVerified) {
                 saveUserToFirestore(user.uid)
             } else {
-                Toast.makeText(this, "Please verify your email first", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Please verify your email first. Check your inbox and spam folder.", Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -188,6 +267,30 @@ class EmailVerificationActivity : AppCompatActivity() {
                 Toast.makeText(this, "Account created successfully!", Toast.LENGTH_SHORT).show()
                 navigateToMain()
             }
+    }
+
+    private fun showAlternativeOptions() {
+        val builder = android.app.AlertDialog.Builder(this)
+        builder.setTitle("Email Sending Blocked")
+        builder.setMessage("Firebase has temporarily blocked email sending. You have several options:")
+        
+        builder.setPositiveButton("Wait and Retry") { dialog, _ ->
+            dialog.dismiss()
+            // User can try again later
+        }
+        
+        builder.setNeutralButton("Skip Verification") { dialog, _ ->
+            dialog.dismiss()
+            // Allow user to proceed without email verification (for testing)
+            saveUserToFirestore(auth.currentUser?.uid ?: "")
+        }
+        
+        builder.setNegativeButton("Cancel") { dialog, _ ->
+            dialog.dismiss()
+            finish()
+        }
+        
+        builder.show()
     }
 
     private fun navigateToMain() {

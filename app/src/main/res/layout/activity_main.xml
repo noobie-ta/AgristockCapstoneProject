@@ -46,16 +46,33 @@
                     android:contentDescription="Menu"
                     android:tint="@color/text_secondary" />
 
-                <TextView
+                <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:layout_marginStart="8dp"
-                    android:text="AgriStock"
-                    android:textColor="#000000"
-                    android:textSize="24sp"
-                    android:textStyle="bold"
-                    android:fontFamily="sans-serif-medium" />
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="AgriStock"
+                        android:textColor="#000000"
+                        android:textSize="20sp"
+                        android:textStyle="bold"
+                        android:fontFamily="sans-serif-medium" />
+
+                    <TextView
+                        android:id="@+id/tv_welcome_username"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Welcome, User"
+                        android:textColor="#666666"
+                        android:textSize="28sp"
+                        android:textStyle="bold"
+                        android:fontFamily="sans-serif-medium" />
+
+                </LinearLayout>
 
             </LinearLayout>
 
@@ -148,68 +165,89 @@
 
         </LinearLayout>
 
-        <!-- Categories Section -->
+        <!-- Modern Filter Section -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="6dp"
+            android:padding="16dp"
             android:background="@color/white"
-            android:layout_marginTop="6dp">
+            android:layout_marginTop="8dp"
+            android:elevation="2dp">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Categories"
-                android:textColor="@color/text_primary"
-                android:textSize="16sp"
-                android:textStyle="bold"
-                android:layout_marginBottom="8dp"
-                android:fontFamily="sans-serif-medium" />
-
-            <!-- Filter Buttons -->
+            <!-- Top Controls: Filter Button + View Toggle -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal">
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="12dp">
 
-                <androidx.appcompat.widget.AppCompatButton
-                    android:id="@+id/btn_filter_all"
-                    android:layout_width="wrap_content"
-                    android:layout_height="32dp"
-                    android:layout_marginEnd="8dp"
-                    android:background="@drawable/filter_toggle_active_ripple"
-                    android:text="ALL"
-                    android:textColor="@color/text_primary"
-                    android:textSize="12sp"
-                    android:textStyle="bold"
-                    android:paddingHorizontal="12dp"
-                    android:fontFamily="sans-serif-medium" />
+                <!-- Filter Button -->
+                <LinearLayout
+                    android:id="@+id/btn_filter"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:background="@drawable/modern_filter_button"
+                    android:padding="12dp"
+                    android:clickable="true"
+                    android:focusable="true">
 
-                <androidx.appcompat.widget.AppCompatButton
-                    android:id="@+id/btn_filter_sell"
-                    android:layout_width="wrap_content"
-                    android:layout_height="32dp"
-                    android:layout_marginEnd="8dp"
-                    android:background="@drawable/filter_toggle_default_ripple"
-                    android:text="SELL"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="12sp"
-                    android:textStyle="bold"
-                    android:paddingHorizontal="12dp"
-                    android:fontFamily="sans-serif-medium" />
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:src="@drawable/ic_filter"
+                        android:tint="@color/text_primary"
+                        android:layout_marginEnd="8dp" />
 
-                <androidx.appcompat.widget.AppCompatButton
-                    android:id="@+id/btn_filter_bid"
+                    <TextView
+                        android:id="@+id/tv_filter_text"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="All Items"
+                        android:textColor="@color/text_primary"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:fontFamily="sans-serif-medium" />
+
+                </LinearLayout>
+
+                <!-- View Toggle -->
+                <LinearLayout
                     android:layout_width="wrap_content"
-                    android:layout_height="32dp"
-                    android:background="@drawable/filter_toggle_default_ripple"
-                    android:text="BID"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="12sp"
-                    android:textStyle="bold"
-                    android:paddingHorizontal="12dp"
-                    android:fontFamily="sans-serif-medium" />
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:background="@drawable/modern_view_toggle_background"
+                    android:padding="4dp"
+                    android:layout_marginStart="12dp">
+
+                    <ImageView
+                        android:id="@+id/btn_list_view_home"
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:background="@drawable/modern_toggle_active"
+                        android:src="@drawable/ic_list_view"
+                        android:padding="8dp"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:contentDescription="List View" />
+
+                    <ImageView
+                        android:id="@+id/btn_grid_view_home"
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:layout_marginStart="4dp"
+                        android:background="@drawable/modern_toggle_inactive"
+                        android:src="@drawable/ic_grid_view"
+                        android:padding="8dp"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:contentDescription="Grid View" />
+
+                </LinearLayout>
 
             </LinearLayout>
 
@@ -237,47 +275,6 @@
                         android:layout_height="wrap_content"
                         android:orientation="vertical">
 
-                        <!-- View Toggle Options -->
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:orientation="horizontal"
-                            android:gravity="end"
-                            android:layout_marginBottom="12dp">
-
-                            <LinearLayout
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:orientation="horizontal"
-                                android:background="@drawable/view_toggle_background"
-                                android:padding="2dp">
-
-                                <ImageView
-                                    android:id="@+id/btn_list_view_home"
-                                    android:layout_width="32dp"
-                                    android:layout_height="32dp"
-                                    android:background="@drawable/view_toggle_active"
-                                    android:src="@drawable/ic_list_view"
-                                    android:padding="6dp"
-                                    android:clickable="true"
-                                    android:focusable="true"
-                                    android:contentDescription="List View" />
-
-                                <ImageView
-                                    android:id="@+id/btn_grid_view_home"
-                                    android:layout_width="32dp"
-                                    android:layout_height="32dp"
-                                    android:layout_marginStart="2dp"
-                                    android:background="@drawable/view_toggle_inactive"
-                                    android:src="@drawable/ic_grid_view"
-                                    android:padding="6dp"
-                                    android:clickable="true"
-                                    android:focusable="true"
-                                    android:contentDescription="Grid View" />
-
-                            </LinearLayout>
-
-                        </LinearLayout>
 
                         <LinearLayout
                             android:id="@+id/ll_posts_container"
@@ -366,14 +363,22 @@
                             android:tint="@color/text_secondary" />
 
                         <!-- Notification Badge -->
-                        <View
+                        <TextView
                             android:id="@+id/badge_notifications"
-                            android:layout_width="8dp"
-                            android:layout_height="8dp"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
                             android:layout_gravity="top|end"
                             android:layout_marginTop="2dp"
                             android:layout_marginEnd="2dp"
                             android:background="@drawable/unread_dot_background"
+                            android:padding="4dp"
+                            android:text="0"
+                            android:textColor="@color/white"
+                            android:textSize="10sp"
+                            android:textStyle="bold"
+                            android:minWidth="16dp"
+                            android:minHeight="16dp"
+                            android:gravity="center"
                             android:visibility="gone" />
 
                     </FrameLayout>
@@ -400,12 +405,38 @@
                     android:background="@drawable/ripple_nav_item"
                     android:padding="6dp">
 
-                    <ImageView
-                        android:layout_width="36dp"
-                        android:layout_height="36dp"
-                        android:padding="4dp"
-                        android:src="@drawable/ic_messages"
-                        android:tint="@color/text_secondary" />
+                    <FrameLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content">
+
+                        <ImageView
+                            android:id="@+id/iv_messages_icon"
+                            android:layout_width="36dp"
+                            android:layout_height="36dp"
+                            android:padding="4dp"
+                            android:src="@drawable/ic_messages"
+                            android:tint="@color/text_secondary" />
+
+                        <!-- Message Badge -->
+                        <TextView
+                            android:id="@+id/badge_messages"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_gravity="top|end"
+                            android:layout_marginTop="2dp"
+                            android:layout_marginEnd="2dp"
+                            android:background="@drawable/unread_dot_background"
+                            android:padding="4dp"
+                            android:text="0"
+                            android:textColor="@color/white"
+                            android:textSize="10sp"
+                            android:textStyle="bold"
+                            android:minWidth="16dp"
+                            android:minHeight="16dp"
+                            android:gravity="center"
+                            android:visibility="gone" />
+
+                    </FrameLayout>
 
                     <TextView
                         android:layout_width="wrap_content"

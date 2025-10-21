@@ -4,7 +4,9 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.text.method.LinkMovementMethod
+import android.view.View
 import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -27,8 +29,11 @@ class ItemDetailsActivity : AppCompatActivity() {
 	private lateinit var tvDescription: TextView
 	private lateinit var btnToggleDescription: TextView
 	private lateinit var btnContactSeller: TextView
-	private lateinit var btnSave: ImageView
+    private lateinit var btnSave: ImageView
     private var currentImageUrl: String? = null
+    private var currentPostId: String? = null
+    private var currentPostTitle: String? = null
+    private var currentPostImageUrl: String? = null
 
 	override fun onCreate(savedInstanceState: Bundle?) {
 		super.onCreate(savedInstanceState)
@@ -84,6 +89,11 @@ class ItemDetailsActivity : AppCompatActivity() {
 				val sellerId = doc.getString("userId") ?: ""
 				val sellerName = doc.getString("sellerName") ?: ""
 				
+				// Store post data for chat creation
+				currentPostId = postId
+				currentPostTitle = title
+				currentPostImageUrl = imageUrl
+				
 				// Debug logging
 				android.util.Log.d("ItemDetailsActivity", "Post data - sellerId: $sellerId, sellerName: $sellerName")
 				android.util.Log.d("ItemDetailsActivity", "All post fields: ${doc.data?.keys}")
@@ -91,12 +101,32 @@ class ItemDetailsActivity : AppCompatActivity() {
 				if (!imageUrl.isNullOrEmpty()) {
 					Glide.with(this).load(imageUrl).into(ivImage)
 					currentImageUrl = imageUrl
+					
+					// Get image URLs for indicators
+					val imageUrls = doc.get("imageUrls") as? List<String> ?: listOf(imageUrl)
+					
+					// Show image indicators if multiple images
+					setupImageIndicators(imageUrls)
+					
+					// Make image clickable for image viewer
+					ivImage.setOnClickListener {
+						val imageUrlList = imageUrls.filter { it.isNotEmpty() }
+						if (imageUrlList.isNotEmpty()) {
+							ImageViewerActivity.start(this, imageUrlList, 0)
+						}
+					}
 				}
 				tvItemName.text = title
 				tvItemPrice.text = formatPrice(price)
 				tvCategoryBadge.text = category.uppercase()
 				tvTimePosted.text = "Posted: $datePosted"
 				tvDescription.text = description
+
+				// Display location
+				val location = doc.getString("location") ?: "Location not specified"
+				val address = doc.getString("address") ?: ""
+				val displayLocation = if (address.isNotEmpty()) address else location
+				findViewById<TextView>(R.id.tv_item_location).text = displayLocation
 
 				setupDescriptionToggle()
 				loadSeller(sellerId, sellerName)
@@ -225,6 +255,45 @@ class ItemDetailsActivity : AppCompatActivity() {
 					}
 				}
 			}
+	}
+
+	private fun setupImageIndicators(imageUrls: List<String>) {
+		try {
+			val tvImageCount = findViewById<TextView>(R.id.tv_image_count)
+			val llImageIndicators = findViewById<LinearLayout>(R.id.ll_image_indicators)
+			
+			if (imageUrls.size > 1) {
+				// Show image count indicator
+				tvImageCount?.let {
+					it.text = "+${imageUrls.size - 1}"
+					it.visibility = View.VISIBLE
+				}
+				
+				// Show dot indicators
+				llImageIndicators?.let { container ->
+					container.removeAllViews()
+					container.visibility = View.VISIBLE
+					
+					for (i in imageUrls.indices) {
+						val indicator = ImageView(this)
+						val layoutParams = LinearLayout.LayoutParams(
+							resources.getDimensionPixelSize(android.R.dimen.app_icon_size) / 3,
+							resources.getDimensionPixelSize(android.R.dimen.app_icon_size) / 3
+						)
+						layoutParams.setMargins(6, 0, 6, 0)
+						indicator.layoutParams = layoutParams
+						indicator.setImageResource(R.drawable.indicator_dot)
+						container.addView(indicator)
+					}
+				}
+			} else {
+				// Hide indicators for single image
+				tvImageCount?.visibility = View.GONE
+				llImageIndicators?.visibility = View.GONE
+			}
+		} catch (e: Exception) {
+			android.util.Log.e("ItemDetailsActivity", "Error setting up image indicators: ${e.message}")
+		}
 	}
 
 	private fun formatPrice(price: String): String {
@@ -456,6 +525,11 @@ class ItemDetailsActivity : AppCompatActivity() {
                 
                 val sellerAvatar = sellerDoc.getString("avatarUrl")
                 
+                // Get item information for the chat
+                val itemTitle = currentPostTitle ?: "Item"
+                val itemId = currentPostId ?: ""
+                val itemImageUrl = currentPostImageUrl
+                
                 // Create new chat document
                 val chatData = hashMapOf(
                     "participants" to listOf(currentUserId, sellerId),
@@ -464,7 +538,10 @@ class ItemDetailsActivity : AppCompatActivity() {
                     "lastMessageSender" to "",
                     "createdAt" to com.google.firebase.Timestamp.now(),
                     "unreadCount_$currentUserId" to 0,
-                    "unreadCount_$sellerId" to 0
+                    "unreadCount_$sellerId" to 0,
+                    "itemTitle" to itemTitle,
+                    "itemId" to itemId,
+                    "itemImageUrl" to itemImageUrl
                 )
                 
                 firestore.collection("chats")
@@ -491,12 +568,51 @@ class ItemDetailsActivity : AppCompatActivity() {
                 firestore.collection("chats")
                     .add(chatData)
                     .addOnSuccessListener { chatDoc ->
-                        navigateToChat(chatDoc.id, sellerId)
+                        // Load seller data before navigating to ensure we have sellerName and sellerAvatar
+                        loadSellerDataForChat(chatDoc.id, sellerId)
                     }
                     .addOnFailureListener {
                         Toast.makeText(this, "Failed to create chat", Toast.LENGTH_SHORT).show()
                     }
             }
+    }
+    
+    private fun loadSellerDataForChat(chatId: String, sellerId: String) {
+        try {
+            firestore.collection("users").document(sellerId)
+                .get()
+                .addOnSuccessListener { userDoc ->
+                    try {
+                        val sellerName = if (userDoc.exists()) {
+                            userDoc.getString("username") ?: 
+                            "${userDoc.getString("firstName") ?: ""} ${userDoc.getString("lastName") ?: ""}".trim()
+                                .ifEmpty { userDoc.getString("displayName") ?: "User" }
+                        } else {
+                            "User"
+                        }
+                        
+                        val sellerAvatar = userDoc.getString("avatarUrl")
+                        
+                        android.util.Log.d("ItemDetailsActivity", "Loaded seller data for chat - sellerName: $sellerName, sellerAvatar: $sellerAvatar")
+                        
+                        // Navigate to chat with complete seller data
+                        navigateToChat(chatId, sellerId, sellerName, sellerAvatar)
+                    } catch (e: Exception) {
+                        android.util.Log.e("ItemDetailsActivity", "Error processing seller data for chat: ${e.message}")
+                        // Navigate with minimal data as fallback
+                        navigateToChat(chatId, sellerId, "User", null)
+                    }
+                }
+                .addOnFailureListener { exception ->
+                    android.util.Log.e("ItemDetailsActivity", "Error loading seller data for chat: ${exception.message}")
+                    // Navigate with minimal data as fallback
+                    navigateToChat(chatId, sellerId, "User", null)
+                }
+        } catch (e: Exception) {
+            android.util.Log.e("ItemDetailsActivity", "Error in loadSellerDataForChat: ${e.message}")
+            // Navigate with minimal data as fallback
+            navigateToChat(chatId, sellerId, "User", null)
+        }
     }
     
     private fun navigateToChat(chatId: String, sellerId: String, sellerName: String = "", sellerAvatar: String? = null) {
@@ -505,6 +621,7 @@ class ItemDetailsActivity : AppCompatActivity() {
         intent.putExtra("otherUserId", sellerId)
         intent.putExtra("otherUserName", sellerName)
         intent.putExtra("otherUserAvatar", sellerAvatar)
+        intent.putExtra("item_id", currentPostId)
         startActivity(intent)
     }
 

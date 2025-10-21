@@ -9,6 +9,8 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
@@ -47,6 +49,12 @@ class NotificationsActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
+        // Configure status bar
+        WindowCompat.setDecorFitsSystemWindows(window, true)
+        window.statusBarColor = ContextCompat.getColor(this, android.R.color.black)
+        val insetsController = WindowCompat.getInsetsController(window, window.decorView)
+        insetsController.isAppearanceLightStatusBars = false
+        
         try {
             setContentView(R.layout.activity_notifications)
             
@@ -54,7 +62,7 @@ class NotificationsActivity : AppCompatActivity() {
             setupRecyclerView()
             loadNotifications()
         } catch (e: Exception) {
-            // If anything fails, just finish the activity
+            android.util.Log.e("NotificationsActivity", "Error in onCreate: ${e.message}")
             finish()
         }
     }
@@ -74,8 +82,7 @@ class NotificationsActivity : AppCompatActivity() {
                 markAllAsRead()
             }
         } catch (e: Exception) {
-            // Handle any view setup errors
-            finish()
+            android.util.Log.e("NotificationsActivity", "Error in setupViews: ${e.message}")
         }
     }
     
@@ -92,120 +99,99 @@ class NotificationsActivity : AppCompatActivity() {
                 recyclerView.adapter = adapter
             }
         } catch (e: Exception) {
-            // Handle any recycler view setup errors
+            android.util.Log.e("NotificationsActivity", "Error in setupRecyclerView: ${e.message}")
         }
     }
     
     private fun loadNotifications() {
         val uid = auth.currentUser?.uid
         if (uid == null) {
-            // User not authenticated, show empty state
+            android.util.Log.w("NotificationsActivity", "User not authenticated")
             updateEmptyState()
             return
         }
         
+        android.util.Log.d("NotificationsActivity", "Loading notifications for user: $uid")
+        
         try {
             notificationsListener = firestore.collection("notifications")
                 .whereEqualTo("toUserId", uid)
-                .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
                 .addSnapshotListener { snapshot, exception ->
                     if (exception != null) {
-                        // Handle error silently and show empty state
+                        android.util.Log.e("NotificationsActivity", "Error loading notifications: ${exception.message}")
                         updateEmptyState()
                         return@addSnapshotListener
                     }
                     
                     if (snapshot != null) {
+                        android.util.Log.d("NotificationsActivity", "Found ${snapshot.size()} notifications")
                         notifications.clear()
+                        
+                        if (snapshot.isEmpty) {
+                            android.util.Log.d("NotificationsActivity", "No notifications found")
+                            updateEmptyState()
+                            return@addSnapshotListener
+                        }
+                        
                         for (document in snapshot.documents) {
                             try {
-                                val postId = document.getString("postId") ?: ""
-                                // Fetch post type from the original post document
-                                firestore.collection("posts").document(postId)
-                                    .get()
-                                    .addOnSuccessListener { postDoc ->
-                                        val postType = postDoc.getString("type") ?: "SELL"
-                                        val notification = NotificationItem(
-                                            id = document.id,
-                                            type = document.getString("type") ?: "",
-                                            postId = postId,
-                                            postTitle = document.getString("postTitle") ?: "",
-                                            postImageUrl = document.getString("postImageUrl"),
-                                            postPrice = document.getString("postPrice") ?: "",
-                                            fromUserId = document.getString("fromUserId") ?: "",
-                                            fromUsername = document.getString("fromUsername") ?: "",
-                                            fromUserAvatar = document.getString("fromUserAvatar"),
-                                            timestamp = document.getTimestamp("timestamp") ?: com.google.firebase.Timestamp.now(),
-                                            isRead = document.getBoolean("isRead") ?: false,
-                                            isPostAvailable = document.getBoolean("isPostAvailable") ?: true,
-                                            postType = postType
-                                        )
-                                        notifications.add(notification)
-                                        
-                                        // Check if post still exists and update notification if needed
-                                        checkPostAvailability(notification)
-                                        
-                                        if (::adapter.isInitialized) {
-                                            adapter.notifyDataSetChanged()
-                                        }
-                                        updateEmptyState()
-                                    }
-                                    .addOnFailureListener {
-                                        // If we can't get the post type, default to SELL
-                                        val notification = NotificationItem(
-                                            id = document.id,
-                                            type = document.getString("type") ?: "",
-                                            postId = postId,
-                                            postTitle = document.getString("postTitle") ?: "",
-                                            postImageUrl = document.getString("postImageUrl"),
-                                            postPrice = document.getString("postPrice") ?: "",
-                                            fromUserId = document.getString("fromUserId") ?: "",
-                                            fromUsername = document.getString("fromUsername") ?: "",
-                                            fromUserAvatar = document.getString("fromUserAvatar"),
-                                            timestamp = document.getTimestamp("timestamp") ?: com.google.firebase.Timestamp.now(),
-                                            isRead = document.getBoolean("isRead") ?: false,
-                                            isPostAvailable = document.getBoolean("isPostAvailable") ?: true,
-                                            postType = "SELL"
-                                        )
-                                        notifications.add(notification)
-                                        
-                                        // Check if post still exists and update notification if needed
-                                        checkPostAvailability(notification)
-                                        
-                                        if (::adapter.isInitialized) {
-                                            adapter.notifyDataSetChanged()
-                                        }
-                                        updateEmptyState()
-                                    }
+                                val notification = NotificationItem(
+                                    id = document.id,
+                                    type = document.getString("type") ?: "",
+                                    postId = document.getString("postId") ?: "",
+                                    postTitle = document.getString("postTitle") ?: "",
+                                    postImageUrl = document.getString("postImageUrl"),
+                                    postPrice = document.getString("postPrice") ?: "",
+                                    fromUserId = document.getString("fromUserId") ?: "",
+                                    fromUsername = document.getString("fromUsername") ?: "",
+                                    fromUserAvatar = document.getString("fromUserAvatar"),
+                                    timestamp = document.getTimestamp("timestamp") ?: com.google.firebase.Timestamp.now(),
+                                    isRead = document.getBoolean("isRead") ?: false,
+                                    isPostAvailable = document.getBoolean("isPostAvailable") ?: true,
+                                    postType = document.getString("postType") ?: "SELL"
+                                )
+                                
+                                notifications.add(notification)
+                                android.util.Log.d("NotificationsActivity", "Added notification: ${notification.postTitle}")
+                                
                             } catch (e: Exception) {
-                                // Skip invalid documents
-                                continue
+                                android.util.Log.e("NotificationsActivity", "Error processing notification: ${e.message}")
                             }
                         }
+                        
+                        // Sort notifications by timestamp (newest first)
+                        notifications.sortByDescending { it.timestamp }
+                        
+                        // Update UI on main thread
+                        runOnUiThread {
+                            if (::adapter.isInitialized) {
+                                adapter.notifyDataSetChanged()
+                            }
+                            updateEmptyState()
+                            android.util.Log.d("NotificationsActivity", "Updated UI with ${notifications.size} notifications")
+                        }
+                        
+                    } else {
+                        android.util.Log.w("NotificationsActivity", "Snapshot is null")
+                        updateEmptyState()
                     }
                 }
         } catch (e: Exception) {
-            // Handle any initialization errors
+            android.util.Log.e("NotificationsActivity", "Error setting up notifications listener: ${e.message}")
             updateEmptyState()
         }
     }
     
-    private fun checkPostAvailability(notification: NotificationItem) {
-        firestore.collection("posts").document(notification.postId)
-            .get()
-            .addOnSuccessListener { postDoc ->
-                val isAvailable = postDoc.exists() && 
-                    (postDoc.getString("status") != "sold" && postDoc.getString("status") != "deleted")
-                
-                if (!isAvailable && notification.isPostAvailable) {
-                    // Update notification to mark post as unavailable
-                    firestore.collection("notifications").document(notification.id)
-                        .update("isPostAvailable", false)
-                        .addOnFailureListener { exception ->
-                            // Handle error silently
-                        }
-                }
+    private fun updateEmptyState() {
+        runOnUiThread {
+            if (notifications.isEmpty()) {
+                emptyView.visibility = View.VISIBLE
+                recyclerView.visibility = View.GONE
+            } else {
+                emptyView.visibility = View.GONE
+                recyclerView.visibility = View.VISIBLE
             }
+        }
     }
     
     private fun markAsRead(notificationId: String) {
@@ -214,102 +200,61 @@ class NotificationsActivity : AppCompatActivity() {
         firestore.collection("notifications").document(notificationId)
             .update("isRead", true)
             .addOnFailureListener { exception ->
-                // Handle error silently or show toast
+                android.util.Log.e("NotificationsActivity", "Failed to mark notification as read: ${exception.message}")
             }
     }
     
     private fun markAllAsRead() {
-        try {
-            val uid = auth.currentUser?.uid ?: return
-            
-            val batch = firestore.batch()
-            notifications.filter { !it.isRead }.forEach { notification ->
-                val docRef = firestore.collection("notifications").document(notification.id)
-                batch.update(docRef, "isRead", true)
+        val uid = auth.currentUser?.uid ?: return
+        
+        // Mark all unread notifications as read
+        for (notification in notifications) {
+            if (!notification.isRead) {
+                markAsRead(notification.id)
             }
-            
-            batch.commit()
-                .addOnSuccessListener {
-                    // Update local data
-                    notifications.forEach { it.copy(isRead = true) }
-                    if (::adapter.isInitialized) {
-                        adapter.notifyDataSetChanged()
-                    }
-                }
-                .addOnFailureListener { exception ->
-                    // Handle error silently
-                }
-        } catch (e: Exception) {
-            // Handle any errors
         }
     }
     
     private fun navigateToItem(notification: NotificationItem) {
-        if (!notification.isPostAvailable) {
-            // Show message that post is no longer available
-            return
-        }
-        
-        val intent = if (notification.postType == "BID") {
-            Intent(this, ViewBiddingActivity::class.java)
-        } else {
-            Intent(this, ItemDetailsActivity::class.java)
-        }
-        intent.putExtra("postId", notification.postId)
-        startActivity(intent)
-    }
-    
-    private fun updateEmptyState() {
         try {
-            if (::emptyView.isInitialized && ::recyclerView.isInitialized) {
-                if (notifications.isEmpty()) {
-                    emptyView.visibility = View.VISIBLE
-                    recyclerView.visibility = View.GONE
-                } else {
-                    emptyView.visibility = View.GONE
-                    recyclerView.visibility = View.VISIBLE
-                }
+            val intent = if (notification.postType == "BID") {
+                Intent(this, ViewBiddingActivity::class.java)
+            } else {
+                Intent(this, ItemDetailsActivity::class.java)
             }
+            intent.putExtra("postId", notification.postId)
+            startActivity(intent)
         } catch (e: Exception) {
-            // Handle any view update errors
+            android.util.Log.e("NotificationsActivity", "Error navigating to item: ${e.message}")
         }
     }
     
-    private fun animateCard(view: View) {
-        val scaleX = android.animation.ObjectAnimator.ofFloat(view, "scaleX", 1f, 0.95f, 1f)
-        val scaleY = android.animation.ObjectAnimator.ofFloat(view, "scaleY", 1f, 0.95f, 1f)
-        scaleX.duration = 150
-        scaleY.duration = 150
-        scaleX.start()
-        scaleY.start()
-    }
-    
-    override fun onStop() {
-        super.onStop()
+    override fun onDestroy() {
+        super.onDestroy()
         notificationsListener?.remove()
-        notificationsListener = null
     }
     
-    private inner class NotificationsAdapter(
+    // Adapter for notifications
+    inner class NotificationsAdapter(
         private val data: List<NotificationItem>,
         private val onItemClick: (NotificationItem) -> Unit
     ) : RecyclerView.Adapter<NotificationsAdapter.ViewHolder>() {
         
-        inner class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-            val card: LinearLayout = itemView.findViewById(R.id.ll_notification_card)
-            val ivPostImage: ImageView = itemView.findViewById(R.id.iv_post_image)
-            val ivUserAvatar: ImageView = itemView.findViewById(R.id.iv_user_avatar)
-            val tvTitle: TextView = itemView.findViewById(R.id.tv_notification_title)
-            val tvSubtitle: TextView = itemView.findViewById(R.id.tv_notification_subtitle)
-            val tvTime: TextView = itemView.findViewById(R.id.tv_notification_time)
-            val tvPrice: TextView = itemView.findViewById(R.id.tv_post_price)
-            val dotUnread: View = itemView.findViewById(R.id.dot_unread)
-            val tvUnavailable: TextView = itemView.findViewById(R.id.tv_unavailable)
+        inner class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+            val card: LinearLayout = view.findViewById(R.id.ll_notification_card)
+            val ivPostImage: ImageView = view.findViewById(R.id.iv_post_image)
+            val ivUserAvatar: ImageView = view.findViewById(R.id.iv_user_avatar)
+            val tvNotificationTitle: TextView = view.findViewById(R.id.tv_notification_title)
+            val tvNotificationSubtitle: TextView = view.findViewById(R.id.tv_notification_subtitle)
+            val tvPostPrice: TextView = view.findViewById(R.id.tv_post_price)
+            val tvNotificationTime: TextView = view.findViewById(R.id.tv_notification_time)
+            val dotUnread: View = view.findViewById(R.id.dot_unread)
         }
         
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
-            val v = LayoutInflater.from(parent.context).inflate(R.layout.item_notification_card, parent, false)
-            return ViewHolder(v)
+            val view = LayoutInflater.from(parent.context)
+                .inflate(R.layout.item_notification_card, parent, false)
+            return ViewHolder(view)
         }
         
         override fun onBindViewHolder(holder: ViewHolder, position: Int) {
@@ -351,34 +296,39 @@ class NotificationsActivity : AppCompatActivity() {
                 
                 // Set notification content
                 if (notification.isPostAvailable) {
-                    holder.tvTitle.text = "${notification.fromUsername} added your item to favorites"
-                    holder.tvSubtitle.text = notification.postTitle
-                    holder.tvPrice.text = notification.postPrice
-                    holder.tvUnavailable.visibility = View.GONE
-                    holder.tvPrice.visibility = View.VISIBLE
+                    holder.tvNotificationTitle.text = "${notification.fromUsername} added your item to favorites"
+                    holder.tvNotificationSubtitle.text = notification.postTitle
+                    holder.tvPostPrice.text = notification.postPrice
                 } else {
-                    holder.tvTitle.text = "Item no longer available"
-                    holder.tvSubtitle.text = "This post has been deleted or sold"
-                    holder.tvUnavailable.visibility = View.VISIBLE
-                    holder.tvPrice.visibility = View.GONE
+                    holder.tvNotificationTitle.text = "${notification.fromUsername} added your item to favorites (Item no longer available)"
+                    holder.tvNotificationSubtitle.text = notification.postTitle
+                    holder.tvPostPrice.text = "Item unavailable"
                 }
                 
                 // Format timestamp
-                try {
-                    val dateFormat = SimpleDateFormat("MMM dd, yyyy 'at' HH:mm", Locale.getDefault())
-                    holder.tvTime.text = dateFormat.format(notification.timestamp.toDate())
-                } catch (e: Exception) {
-                    holder.tvTime.text = "Recently"
-                }
+                val formatter = SimpleDateFormat("MMM dd, yyyy 'at' hh:mm a", Locale.getDefault())
+                holder.tvNotificationTime.text = formatter.format(notification.timestamp.toDate())
+                
             } catch (e: Exception) {
-                // Handle any binding errors gracefully
-                holder.tvTitle.text = "Error loading notification"
-                holder.tvSubtitle.text = ""
-                holder.tvPrice.text = ""
-                holder.tvTime.text = ""
+                android.util.Log.e("NotificationsActivity", "Error binding notification: ${e.message}")
             }
         }
         
         override fun getItemCount(): Int = data.size
+        
+        private fun animateCard(view: View) {
+            view.animate()
+                .scaleX(0.95f)
+                .scaleY(0.95f)
+                .setDuration(100)
+                .withEndAction {
+                    view.animate()
+                        .scaleX(1f)
+                        .scaleY(1f)
+                        .setDuration(100)
+                        .start()
+                }
+                .start()
+        }
     }
 }

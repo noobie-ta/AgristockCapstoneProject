@@ -1,5 +1,6 @@
 package com.example.agristockcapstoneproject
 
+import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.Manifest
@@ -30,6 +31,8 @@ class SellPostActivity : AppCompatActivity() {
     private lateinit var priceEditText: EditText
     private lateinit var descriptionEditText: EditText
     private lateinit var categorySpinner: Spinner
+    private lateinit var locationEditText: EditText
+    private lateinit var pickLocationButton: Button
     private lateinit var postButton: Button
     private lateinit var cancelButton: Button
 
@@ -39,6 +42,11 @@ class SellPostActivity : AppCompatActivity() {
     
     private val selectedImageUris: MutableList<Uri> = mutableListOf()
     private val uploadedImageUrls: MutableList<String> = mutableListOf()
+    
+    // Location data
+    private var selectedLatitude: Double = 0.0
+    private var selectedLongitude: Double = 0.0
+    private var selectedAddress: String = ""
 
     private val requestImagePermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -59,6 +67,31 @@ class SellPostActivity : AppCompatActivity() {
         selectedImageUris.clear()
         selectedImageUris.addAll(limited)
         showSelectedImages(limited)
+    }
+
+    private val locationPickerLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            val data = result.data
+            selectedLatitude = data?.getDoubleExtra("latitude", 0.0) ?: 0.0
+            selectedLongitude = data?.getDoubleExtra("longitude", 0.0) ?: 0.0
+            selectedAddress = data?.getStringExtra("address") ?: ""
+            
+            // Update the location edit text
+            locationEditText.setText(selectedAddress)
+        }
+    }
+
+    private val previewLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            val confirmPost = result.data?.getBooleanExtra("confirmPost", false) ?: false
+            if (confirmPost) {
+                uploadImageAndPost()
+            }
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -82,6 +115,8 @@ class SellPostActivity : AppCompatActivity() {
             priceEditText = findViewById(R.id.et_price)
             descriptionEditText = findViewById(R.id.et_description)
             categorySpinner = findViewById(R.id.spinner_category)
+            locationEditText = findViewById(R.id.et_location)
+            pickLocationButton = findViewById(R.id.btn_pick_location)
             postButton = findViewById(R.id.btn_post)
             cancelButton = findViewById(R.id.btn_cancel)
         } catch (e: Exception) {
@@ -100,9 +135,13 @@ class SellPostActivity : AppCompatActivity() {
                 removeSelectedImage()
             }
             
+            pickLocationButton.setOnClickListener {
+                openLocationPicker()
+            }
+            
             postButton.setOnClickListener {
                 if (validateForm()) {
-                    uploadImageAndPost()
+                    showPostPreview()
                 }
             }
             
@@ -192,6 +231,36 @@ class SellPostActivity : AppCompatActivity() {
         return true
     }
 
+    private fun openLocationPicker() {
+        val intent = Intent(this, LocationPickerActivity::class.java)
+        locationPickerLauncher.launch(intent)
+    }
+
+    private fun showPostPreview() {
+        val title = titleEditText.text.toString().trim()
+        val price = priceEditText.text.toString().trim()
+        val description = descriptionEditText.text.toString().trim()
+        val category = categorySpinner.selectedItem.toString()
+        val location = locationEditText.text.toString().trim()
+        
+        // Get first image URL for preview
+        val imageUrl = if (selectedImageUris.isNotEmpty()) {
+            // For preview, we'll use the first image URI directly
+            selectedImageUris.first().toString()
+        } else {
+            ""
+        }
+        
+        val intent = Intent(this, PostPreviewActivity::class.java)
+        intent.putExtra("title", title)
+        intent.putExtra("price", price)
+        intent.putExtra("description", description)
+        intent.putExtra("category", category)
+        intent.putExtra("location", location)
+        intent.putExtra("imageUrl", imageUrl)
+        previewLauncher.launch(intent)
+    }
+
     private fun uploadImageAndPost() {
         postButton.isEnabled = false
         postButton.text = "Posting..."
@@ -218,7 +287,7 @@ class SellPostActivity : AppCompatActivity() {
         }
 
         val timestamp = System.currentTimeMillis()
-        val imageRef = storage.reference.child("post_images/${user.uid}_${timestamp}.jpg")
+        val imageRef = storage.reference.child("post_images/${user.uid}/${timestamp}.jpg")
 
         // Add metadata to the upload
         val metadata = com.google.firebase.storage.StorageMetadata.Builder()
@@ -296,13 +365,16 @@ class SellPostActivity : AppCompatActivity() {
                     "price" to price,
                     "description" to description,
                     "category" to category,
-                    "imageUrls" to uploadedImageUrls,
+                    "imageUrls" to uploadedImageUrls as List<Any>,
                     "imageUrl" to uploadedImageUrls.firstOrNull(), // Store first image for compatibility
                     "timestamp" to timestamp,
                     "datePosted" to datePosted,
                     "status" to "Available",
                     "sellerName" to sellerName,
-                    "location" to "Manila", // You can add location picker later
+                    "location" to locationEditText.text.toString().trim().ifEmpty { "Location not specified" },
+                    "latitude" to selectedLatitude,
+                    "longitude" to selectedLongitude,
+                    "address" to selectedAddress,
                     "favoriteCount" to 0L // Initialize favorite count
                 )
 
@@ -327,13 +399,16 @@ class SellPostActivity : AppCompatActivity() {
                     "price" to price,
                     "description" to description,
                     "category" to category,
-                    "imageUrls" to uploadedImageUrls,
+                    "imageUrls" to uploadedImageUrls as List<Any>,
                     "imageUrl" to uploadedImageUrls.firstOrNull(),
                     "timestamp" to timestamp,
                     "datePosted" to datePosted,
                     "status" to "Available",
                     "sellerName" to fallbackName,
-                    "location" to "Manila",
+                    "location" to locationEditText.text.toString().trim().ifEmpty { "Location not specified" },
+                    "latitude" to selectedLatitude,
+                    "longitude" to selectedLongitude,
+                    "address" to selectedAddress,
                     "favoriteCount" to 0L
                 )
 

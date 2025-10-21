@@ -47,4 +47,7 @@
     <string name="back">Back</string>
     <string name="sell">SELL</string>
     <string name="upload_image">Upload Image</string>
+    
+    <!-- Google Maps API Key - Replace with your actual API key -->
+    <string name="google_maps_key">AIzaSyAMM_Fxj8RhUee5YjKpGnmCmcvGO7zHN5c</string>
 </resources>

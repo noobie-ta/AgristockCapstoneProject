@@ -43,8 +43,6 @@ class ProfileActivity : AppCompatActivity() {
 	private lateinit var tvBio: TextView
 	private lateinit var tvLocation: TextView
 	private lateinit var tvContact: TextView
-	private lateinit var progressCompletion: ProgressBar
-	private lateinit var tvCompletionPercentage: TextView
 	private lateinit var btnEditProfile: ImageView
 	
 	// Rating Views
@@ -127,11 +125,29 @@ class ProfileActivity : AppCompatActivity() {
 		}
 	}
 	
+	
+	
+	
+	
+	
+	
+	override fun onResume() {
+		super.onResume()
+	}
+	
+	override fun onPause() {
+		super.onPause()
+	}
+	
 	override fun onStop() {
 		super.onStop()
 		// Clean up all post listeners to prevent memory leaks
 		postListeners.values.forEach { it.remove() }
 		postListeners.clear()
+	}
+	
+	override fun onDestroy() {
+		super.onDestroy()
 	}
 
 	private fun initializeViews() {
@@ -145,8 +161,6 @@ class ProfileActivity : AppCompatActivity() {
 		tvBio = findViewById(R.id.tv_bio)
 		tvLocation = findViewById(R.id.tv_location)
 		tvContact = findViewById(R.id.tv_contact)
-		progressCompletion = findViewById(R.id.progress_completion)
-		tvCompletionPercentage = findViewById(R.id.tv_completion_percentage)
 		btnEditProfile = findViewById(R.id.btn_edit_profile)
 		
 		// Rating Views
@@ -341,6 +355,9 @@ class ProfileActivity : AppCompatActivity() {
 				
 				// Load location
 				val location = document.getString("location") ?: ""
+				val latitude = document.getDouble("latitude") ?: 0.0
+				val longitude = document.getDouble("longitude") ?: 0.0
+				
 				if (location.isNotEmpty()) {
 					tvLocation.text = location
 				} else {
@@ -375,8 +392,6 @@ class ProfileActivity : AppCompatActivity() {
 					Glide.with(this).load(coverUrl).into(coverPhotoView)
 				}
 				
-				// Update profile completion
-				updateProfileCompletion()
 			}
 			.addOnFailureListener {
 				tvUsername.text = user.displayName ?: "User"
@@ -391,8 +406,6 @@ class ProfileActivity : AppCompatActivity() {
 		btnEditProfile.visibility = View.GONE
 		btnEditCover.visibility = View.GONE
 		uploadIcon.visibility = View.GONE
-		progressCompletion.visibility = View.GONE
-		tvCompletionPercentage.visibility = View.GONE
 		
 		val userRef = FirebaseFirestore.getInstance().collection("users").document(sellerId)
 		userRef.get()
@@ -463,7 +476,7 @@ class ProfileActivity : AppCompatActivity() {
 			tvRatingText.text = String.format("%.1f", rating)
 			tvTotalRatings.text = "$totalRatings ratings"
 		} else {
-			tvRatingText.text = "No ratings"
+			tvRatingText.text = ""
 			tvTotalRatings.text = "0 ratings"
 		}
 		
@@ -494,7 +507,7 @@ class ProfileActivity : AppCompatActivity() {
 
 	private fun uploadAvatarAndSave(uri: Uri) {
 		val user = auth.currentUser ?: return
-		val ref = storage.reference.child("avatars/${user.uid}.jpg")
+		val ref = storage.reference.child("user_uploads/${user.uid}/avatar.jpg")
 		ref.putFile(uri)
 			.continueWithTask { task ->
 				if (!task.isSuccessful) {
@@ -521,7 +534,7 @@ class ProfileActivity : AppCompatActivity() {
 	
 	private fun uploadCoverPhotoAndSave(uri: Uri) {
 		val user = auth.currentUser ?: return
-		val ref = storage.reference.child("covers/${user.uid}.jpg")
+		val ref = storage.reference.child("user_uploads/${user.uid}/cover.jpg")
 		ref.putFile(uri)
 			.continueWithTask { task ->
 				if (!task.isSuccessful) {
@@ -656,20 +669,40 @@ class ProfileActivity : AppCompatActivity() {
 				}
 			}
 			
-		// Load image with loading effect
-			if (!post.imageUrl.isNullOrEmpty()) {
-			Glide.with(this)
-				.load(post.imageUrl)
-				.centerCrop()
-				.placeholder(R.drawable.ic_image_placeholder)
-				.error(R.drawable.ic_image_placeholder)
-				.into(ivImage)
+		// Load image with loading effect and make clickable
+		val imagePostRef = firestore.collection("posts").document(post.id)
+		imagePostRef.get().addOnSuccessListener { doc ->
+			if (doc.exists()) {
+				val imageUrl = doc.getString("imageUrl") ?: 
+					(doc.get("imageUrls") as? List<String>)?.firstOrNull()?.toString()
+				val imageUrls = doc.get("imageUrls") as? List<String> ?: emptyList()
+				
+				if (!imageUrl.isNullOrEmpty()) {
+					Glide.with(this)
+						.load(imageUrl)
+						.centerCrop()
+						.placeholder(R.drawable.ic_image_placeholder)
+						.error(R.drawable.ic_image_placeholder)
+						.into(ivImage)
+					
+					// Make image clickable for image viewer (works for single or multiple images)
+					ivImage.setOnClickListener {
+						val imageUrlList = if (imageUrls.isNotEmpty()) {
+							imageUrls.filter { it.isNotEmpty() }
+						} else {
+							listOf(imageUrl).filter { it.isNotEmpty() }
+						}
+						if (imageUrlList.isNotEmpty()) {
+							ImageViewerActivity.start(this, imageUrlList, 0)
+						}
+					}
+				} else {
+					ivImage.setImageResource(R.drawable.ic_image_placeholder)
+				}
+			}
 			
 			// Hide loading shimmer after image loads
 			llLoadingShimmer.visibility = View.GONE
-		} else {
-			llLoadingShimmer.visibility = View.GONE
-			ivImage.setImageResource(R.drawable.ic_image_placeholder)
 		}
 
 		// 3-dot menu click
@@ -696,6 +729,7 @@ class ProfileActivity : AppCompatActivity() {
 		itemView.isClickable = true
 		itemView.isFocusable = true
 	}
+
 
 	private fun showDeleteConfirmDialog(postId: String) {
 		val dialogView = layoutInflater.inflate(R.layout.dialog_confirm_delete, null)
@@ -812,41 +846,32 @@ class ProfileActivity : AppCompatActivity() {
 
 	// New Enhanced Methods
 	
-	private fun updateProfileCompletion() {
-		val user = auth.currentUser ?: return
-		var completionScore = 0
-		
-		// Check profile fields
-		if (tvUsername.text.toString() != "User" && tvUsername.text.toString().isNotEmpty()) completionScore += 20
-		if (tvBio.text.toString() != "Bio not set" && tvBio.text.toString().isNotEmpty()) completionScore += 20
-		if (tvLocation.text.toString() != "Location not set" && tvLocation.text.toString().isNotEmpty()) completionScore += 20
-		if (tvContact.text.toString() != "Contact not set" && tvContact.text.toString().isNotEmpty()) completionScore += 20
-		
-		// Check if avatar is set
-		if (avatarView.drawable != null && avatarView.drawable != ContextCompat.getDrawable(this, R.drawable.ic_profile)) {
-			completionScore += 20
-		}
-		
-		progressCompletion.progress = completionScore
-		tvCompletionPercentage.text = "$completionScore%"
-	}
 
 	private fun showEditProfileDialog() {
 		val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_edit_profile, null)
+		val etUsername = dialogView.findViewById<EditText>(R.id.et_username)
 		val etBio = dialogView.findViewById<EditText>(R.id.et_bio)
 		val etLocation = dialogView.findViewById<EditText>(R.id.et_location)
 		val etContact = dialogView.findViewById<EditText>(R.id.et_contact)
+		val btnPickLocation = dialogView.findViewById<Button>(R.id.btn_pick_location)
 		
 		// Pre-fill current values
+		etUsername.setText(tvUsername.text.toString())
 		etBio.setText(tvBio.text.toString().takeIf { it != "Bio not set" } ?: "")
 		etLocation.setText(tvLocation.text.toString().takeIf { it != "Location not set" } ?: "")
 		etContact.setText(tvContact.text.toString().takeIf { it != "Contact not set" } ?: "")
+		
+		// Set up location picker button
+		btnPickLocation.setOnClickListener {
+			openLocationPickerForEdit(etLocation)
+		}
 		
 		AlertDialog.Builder(this)
 			.setTitle("Edit Profile")
 			.setView(dialogView)
 			.setPositiveButton("Save") { _, _ ->
 				saveProfileData(
+					etUsername.text.toString(),
 					etBio.text.toString(),
 					etLocation.text.toString(),
 					etContact.text.toString()
@@ -856,10 +881,43 @@ class ProfileActivity : AppCompatActivity() {
 			.show()
 	}
 
-	private fun saveProfileData(bio: String, location: String, contact: String) {
+	private fun openLocationPickerForEdit(etLocation: EditText) {
+		val intent = Intent(this, LocationPickerActivity::class.java)
+		// Pass current location if available
+		val currentLocation = etLocation.text.toString()
+		if (currentLocation.isNotEmpty() && currentLocation != "Location not set") {
+			// You could parse the current location to get coordinates if needed
+			// For now, just open the location picker
+		}
+		// Store reference to the EditText for updating
+		currentLocationEditText = etLocation
+		locationPickerLauncherForEdit.launch(intent)
+	}
+
+	private var currentLocationEditText: EditText? = null
+
+	private val locationPickerLauncherForEdit = registerForActivityResult(
+		ActivityResultContracts.StartActivityForResult()
+	) { result ->
+		if (result.resultCode == RESULT_OK) {
+			val data = result.data
+			val latitude = data?.getDoubleExtra("latitude", 0.0) ?: 0.0
+			val longitude = data?.getDoubleExtra("longitude", 0.0) ?: 0.0
+			val address = data?.getStringExtra("address") ?: ""
+			
+			if (latitude != 0.0 && longitude != 0.0 && address.isNotEmpty()) {
+				// Update the location field in the dialog
+				currentLocationEditText?.setText(address)
+				Toast.makeText(this, "Location selected: $address", Toast.LENGTH_SHORT).show()
+			}
+		}
+	}
+
+	private fun saveProfileData(username: String, bio: String, location: String, contact: String) {
 		val user = auth.currentUser ?: return
 		
 		val updates = mapOf(
+			"username" to username,
 			"bio" to bio,
 			"location" to location,
 			"contact" to contact
@@ -869,10 +927,10 @@ class ProfileActivity : AppCompatActivity() {
 			.update(updates)
 			.addOnSuccessListener {
 				// Update UI
+				tvUsername.text = username.ifEmpty { "Username not set" }
 				tvBio.text = bio.ifEmpty { "Bio not set" }
 				tvLocation.text = location.ifEmpty { "Location not set" }
 				tvContact.text = contact.ifEmpty { "Contact not set" }
-				updateProfileCompletion()
 				Toast.makeText(this, "Profile updated successfully!", Toast.LENGTH_SHORT).show()
 			}
 			.addOnFailureListener { exception ->

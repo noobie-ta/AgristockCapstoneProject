@@ -60,18 +60,26 @@
 
         </LinearLayout>
 
-        <!-- Report Button -->
+        <!-- Overflow Menu Button -->
         <ImageView
-            android:id="@+id/btn_report"
+            android:id="@+id/btn_overflow"
             android:layout_width="24dp"
             android:layout_height="24dp"
             android:src="@drawable/ic_more_vert"
             android:tint="@color/text_secondary"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:padding="4dp"
-            android:contentDescription="Report" />
+            android:contentDescription="More options" />
 
     </LinearLayout>
+
+    <!-- Item Info Card -->
+    <include
+        android:id="@+id/item_info_card"
+        layout="@layout/item_info_card"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone" />
 
     <!-- Progress Bar -->
     <ProgressBar
@@ -81,6 +89,43 @@
         android:layout_gravity="center"
         android:layout_marginTop="32dp"
         android:visibility="gone" />
+
+    <!-- Upload Progress -->
+    <LinearLayout
+        android:id="@+id/ll_upload_progress"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="@color/background_secondary"
+        android:padding="12dp"
+        android:gravity="center_vertical"
+        android:visibility="gone"
+        android:layout_margin="8dp"
+        android:elevation="4dp">
+
+        <ProgressBar
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:layout_marginEnd="12dp" />
+
+        <TextView
+            android:id="@+id/tv_upload_status"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Uploading..."
+            android:textColor="@color/text_primary"
+            android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/tv_upload_percentage"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="0%"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp" />
+
+    </LinearLayout>
 
     <!-- Messages List -->
     <androidx.recyclerview.widget.RecyclerView
@@ -126,6 +171,60 @@
             android:textColor="@color/text_secondary"
             android:textSize="14sp"
             android:gravity="center" />
+
+    </LinearLayout>
+
+    <!-- Image Preview -->
+    <LinearLayout
+        android:id="@+id/ll_image_preview"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="16dp"
+        android:background="@color/background_secondary"
+        android:visibility="gone">
+
+        <ImageView
+            android:id="@+id/iv_image_preview"
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:scaleType="centerCrop"
+            android:background="@color/gray_100"
+            android:layout_marginEnd="12dp" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Image selected"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tv_image_name"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="image.jpg"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp" />
+
+        </LinearLayout>
+
+        <ImageView
+            android:id="@+id/btn_remove_image"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_close"
+            android:tint="@color/text_secondary"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:padding="4dp" />
 
     </LinearLayout>
 

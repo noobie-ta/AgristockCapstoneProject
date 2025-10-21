@@ -108,18 +108,16 @@ class SignUpActivity : AppCompatActivity() {
                 if (task.isSuccessful) {
                     val user = auth.currentUser
                     if (user != null) {
-                        val userData = hashMapOf(
-                            "firstName" to firstName,
-                            "lastName" to lastName,
-                            "email" to email,
-                            "phone" to phone,
-                            "createdAt" to com.google.firebase.Timestamp.now(),
-                            "isEmailVerified" to (user.isEmailVerified)
-                        )
-                        firestore.collection("users").document(user.uid)
-                            .set(userData)
-                            .addOnCompleteListener {
-                                navigateToMain()
+                        // Send email verification first
+                        user.sendEmailVerification()
+                            .addOnCompleteListener { verificationTask ->
+                                if (verificationTask.isSuccessful) {
+                                    // Navigate to email verification activity
+                                    navigateToEmailVerification(firstName, lastName, email, phone, password)
+                                } else {
+                                    // Even if email sending fails, proceed to verification screen
+                                    navigateToEmailVerification(firstName, lastName, email, phone, password)
+                                }
                             }
                     } else {
                         Toast.makeText(this, "Account creation failed", Toast.LENGTH_LONG).show()
@@ -132,6 +130,17 @@ class SignUpActivity : AppCompatActivity() {
                     binding.btnSignUp.text = "Sign Up"
                 }
             }
+    }
+
+    private fun navigateToEmailVerification(firstName: String, lastName: String, email: String, phone: String, password: String) {
+        val intent = Intent(this, EmailVerificationActivity::class.java)
+        intent.putExtra("firstName", firstName)
+        intent.putExtra("lastName", lastName)
+        intent.putExtra("email", email)
+        intent.putExtra("phone", phone)
+        intent.putExtra("password", password)
+        startActivity(intent)
+        finish()
     }
 
     private fun navigateToMain() {

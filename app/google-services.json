@@ -8,35 +8,6 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:57597815409:android:01a4e2688e810ffdcfc9d0",
-        "android_client_info": {
-          "package_name": "com.example.agristock"
-        }
-      },
-      "oauth_client": [
-        {
-          "client_id": "57597815409-enkih5vf5m4htia33e2j5clh3a6e6i6p.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
-      "api_key": [
-        {
-          "current_key": "AIzaSyA4a28BhROtIihR5Eav8f2btwork96G_0U"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "57597815409-enkih5vf5m4htia33e2j5clh3a6e6i6p.apps.googleusercontent.com",
-              "client_type": 3
-            }
-          ]
-        }
-      }
-    },
-    {
-      "client_info": {
         "mobilesdk_app_id": "1:57597815409:android:5e0fa8b1ceb5283dcfc9d0",
         "android_client_info": {
           "package_name": "com.example.agristockcapstoneproject"

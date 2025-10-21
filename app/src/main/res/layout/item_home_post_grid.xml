@@ -85,11 +85,25 @@
             android:fontFamily="sans-serif-medium"
             android:layout_marginBottom="4dp" />
 
+        <!-- Seller Rating -->
+        <TextView
+            android:id="@+id/tv_seller_rating"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="Seller: Unknown"
+            android:textColor="@color/text_secondary"
+            android:textSize="9sp"
+            android:fontFamily="sans-serif"
+            android:maxLines="1"
+            android:ellipsize="end" />
+
         <!-- Status Chip -->
         <TextView
             android:id="@+id/tv_status_badge"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
             android:paddingHorizontal="8dp"
             android:paddingVertical="3dp"
             android:text="Available"

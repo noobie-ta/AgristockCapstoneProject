@@ -36,6 +36,8 @@ class ViewBiddingActivity : AppCompatActivity() {
     private var countdownTimer: CountDownTimer? = null
     private var itemId: String? = null
     private var biddingEndTime: Long = 0
+    private var currentPostTitle: String? = null
+    private var currentPostImageUrl: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -103,8 +105,20 @@ class ViewBiddingActivity : AppCompatActivity() {
                     val data = document.data!!
                     
                     // Load item details
-                    itemNameText.text = data["title"]?.toString() ?: "Unknown Item"
+                    val title = data["title"]?.toString() ?: "Unknown Item"
+                    val postImageUrl = data["imageUrl"]?.toString()
+                    itemNameText.text = title
                     descriptionText.text = data["description"]?.toString() ?: "No description available"
+                    
+                    // Store post data for chat creation
+                    currentPostTitle = title
+                    currentPostImageUrl = postImageUrl
+                    
+                    // Display location
+                    val location = data["location"]?.toString() ?: "Location not specified"
+                    val address = data["address"]?.toString() ?: ""
+                    val displayLocation = if (address.isNotEmpty()) address else location
+                    findViewById<TextView>(R.id.tv_item_location).text = displayLocation
                     
                     // Load seller information
                     val sellerId = data["userId"]?.toString()
@@ -132,25 +146,53 @@ class ViewBiddingActivity : AppCompatActivity() {
                             .placeholder(R.drawable.ic_image_placeholder)
                             .error(R.drawable.ic_image_placeholder)
                             .into(itemImageView)
+                        
+                        // Get image URLs for indicators
+                        val imageUrls = data["imageUrls"] as? List<String> ?: listOf(imageUrl)
+                        
+                        // Show image indicators if multiple images
+                        setupImageIndicators(imageUrls)
+                        
+                        // Make image clickable for image viewer
+                        itemImageView.setOnClickListener {
+                            val imageUrlList = imageUrls.filter { it.isNotEmpty() }
+                            if (imageUrlList.isNotEmpty()) {
+                                ImageViewerActivity.start(this, imageUrlList, 0)
+                            }
+                        }
                     } else {
                         itemImageView.setImageResource(R.drawable.ic_image_placeholder)
                     }
                     
-                    // Set bidding details
-                    val startingBid = data["startingBid"]?.toString() ?: "₱0"
-                    val highestBid = data["highestBid"]?.toString() ?: startingBid
-                    val totalBidders = data["totalBidders"]?.toString() ?: "0"
+                    // Set bidding details with proper data type handling
+                    val startingBidValue = when (val startingBidData = data["startingBid"]) {
+                        is Number -> startingBidData.toDouble()
+                        is String -> startingBidData.replace("₱", "").replace(",", "").toDoubleOrNull() ?: 0.0
+                        else -> 0.0
+                    }
                     
-                    startingBidText.text = "Starting Bid: ${formatPrice(startingBid)}"
-                    highestBidText.text = "Highest Bid: ${formatPrice(highestBid)}"
-                    totalBiddersText.text = "Total Bidders: $totalBidders"
+                    val highestBidValue = when (val highestBidData = data["highestBid"]) {
+                        is Number -> highestBidData.toDouble()
+                        is String -> highestBidData.replace("₱", "").replace(",", "").toDoubleOrNull() ?: startingBidValue
+                        else -> startingBidValue
+                    }
+                    
+                    val totalBiddersValue = when (val totalBiddersData = data["totalBidders"]) {
+                        is Number -> totalBiddersData.toInt()
+                        is String -> totalBiddersData.toIntOrNull() ?: 0
+                        else -> 0
+                    }
+                    
+                    startingBidText.text = "Starting Bid: ₱${String.format("%.2f", startingBidValue)}"
+                    highestBidText.text = "Highest Bid: ₱${String.format("%.2f", highestBidValue)}"
+                    totalBiddersText.text = "Total Bidders: $totalBiddersValue"
                     
                     // Set bidding end time and start countdown
-                    val biddingEndTimeString = data["biddingEndTime"]?.toString()
+                    val biddingEndTimeString = data["endTime"]?.toString() ?: data["biddingEndTime"]?.toString()
                     if (!biddingEndTimeString.isNullOrEmpty()) {
                         biddingEndTime = biddingEndTimeString.toLongOrNull() ?: System.currentTimeMillis() + 86400000
                     } else {
-                        // If no biddingEndTime is set, calculate it from createdAt + 24 hours
+                        // If no endTime is set, calculate it from createdAt + 24 hours
                         val createdAt = data["createdAt"]?.let { 
                             if (it is com.google.firebase.Timestamp) {
                                 it.toDate().time
@@ -175,6 +217,45 @@ class ViewBiddingActivity : AppCompatActivity() {
             }
     }
 
+    private fun setupImageIndicators(imageUrls: List<String>) {
+        try {
+            val tvImageCount = findViewById<TextView>(R.id.tv_image_count)
+            val llImageIndicators = findViewById<LinearLayout>(R.id.ll_image_indicators)
+            
+            if (imageUrls.size > 1) {
+                // Show image count indicator
+                tvImageCount?.let {
+                    it.text = "+${imageUrls.size - 1}"
+                    it.visibility = View.VISIBLE
+                }
+                
+                // Show dot indicators
+                llImageIndicators?.let { container ->
+                    container.removeAllViews()
+                    container.visibility = View.VISIBLE
+                    
+                    for (i in imageUrls.indices) {
+                        val indicator = ImageView(this)
+                        val layoutParams = LinearLayout.LayoutParams(
+                            resources.getDimensionPixelSize(android.R.dimen.app_icon_size) / 3,
+                            resources.getDimensionPixelSize(android.R.dimen.app_icon_size) / 3
+                        )
+                        layoutParams.setMargins(6, 0, 6, 0)
+                        indicator.layoutParams = layoutParams
+                        indicator.setImageResource(R.drawable.indicator_dot)
+                        container.addView(indicator)
+                    }
+                }
+            } else {
+                // Hide indicators for single image
+                tvImageCount?.visibility = View.GONE
+                llImageIndicators?.visibility = View.GONE
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("ViewBiddingActivity", "Error setting up image indicators: ${e.message}")
+        }
+    }
+
     private fun startCountdown() {
         val timeLeft = biddingEndTime - System.currentTimeMillis()
         
@@ -186,10 +267,20 @@ class ViewBiddingActivity : AppCompatActivity() {
                     val minutes = (millisUntilFinished % (1000 * 60 * 60)) / (1000 * 60)
                     val seconds = (millisUntilFinished % (1000 * 60)) / 1000
                     
-                    countdownText.text = if (days > 0) {
-                        String.format("%d days, %02d:%02d:%02d", days, hours, minutes, seconds)
-                    } else {
-                        String.format("%02d:%02d:%02d", hours, minutes, seconds)
+                    countdownText.text = when {
+                        days > 0 -> {
+                            if (days == 1L) {
+                                String.format("1 day, %02d:%02d:%02d", hours, minutes, seconds)
+                            } else {
+                                String.format("%d days, %02d:%02d:%02d", days, hours, minutes, seconds)
+                            }
+                        }
+                        hours > 0 -> {
+                            String.format("%02d:%02d:%02d", hours, minutes, seconds)
+                        }
+                        else -> {
+                            String.format("%02d:%02d", minutes, seconds)
+                        }
                     }
                 }
                 
@@ -503,8 +594,8 @@ class ViewBiddingActivity : AppCompatActivity() {
                 }
                 
                 if (existingChatId != null) {
-                    // Chat exists, navigate to it
-                    navigateToChat(existingChatId, sellerId)
+                    // Chat exists, load seller data before navigating
+                    loadSellerDataForChat(existingChatId, sellerId)
                 } else {
                     // Create new chat
                     createNewChat(sellerId)
@@ -532,6 +623,11 @@ class ViewBiddingActivity : AppCompatActivity() {
                 
                 val sellerAvatar = sellerDoc.getString("avatarUrl")
                 
+                // Get item information for the chat
+                val itemTitle = currentPostTitle ?: "Item"
+                val itemId = this@ViewBiddingActivity.itemId ?: ""
+                val itemImageUrl = currentPostImageUrl
+                
                 // Create new chat document
                 val chatData = hashMapOf(
                     "participants" to listOf(currentUserId, sellerId),
@@ -540,7 +636,10 @@ class ViewBiddingActivity : AppCompatActivity() {
                     "lastMessageSender" to "",
                     "createdAt" to com.google.firebase.Timestamp.now(),
                     "unreadCount_$currentUserId" to 0,
-                    "unreadCount_$sellerId" to 0
+                    "unreadCount_$sellerId" to 0,
+                    "itemTitle" to itemTitle,
+                    "itemId" to itemId,
+                    "itemImageUrl" to itemImageUrl
                 )
                 
                 firestore.collection("chats")
@@ -575,12 +674,51 @@ class ViewBiddingActivity : AppCompatActivity() {
             }
     }
     
+    private fun loadSellerDataForChat(chatId: String, sellerId: String) {
+        try {
+            firestore.collection("users").document(sellerId)
+                .get()
+                .addOnSuccessListener { userDoc ->
+                    try {
+                        val sellerName = if (userDoc.exists()) {
+                            userDoc.getString("username") ?: 
+                            "${userDoc.getString("firstName") ?: ""} ${userDoc.getString("lastName") ?: ""}".trim()
+                                .ifEmpty { userDoc.getString("displayName") ?: "User" }
+                        } else {
+                            "User"
+                        }
+                        
+                        val sellerAvatar = userDoc.getString("avatarUrl")
+                        
+                        android.util.Log.d("ViewBiddingActivity", "Loaded seller data for chat - sellerName: $sellerName, sellerAvatar: $sellerAvatar")
+                        
+                        // Navigate to chat with complete seller data
+                        navigateToChat(chatId, sellerId, sellerName, sellerAvatar)
+                    } catch (e: Exception) {
+                        android.util.Log.e("ViewBiddingActivity", "Error processing seller data for chat: ${e.message}")
+                        // Navigate with minimal data as fallback
+                        navigateToChat(chatId, sellerId, "User", null)
+                    }
+                }
+                .addOnFailureListener { exception ->
+                    android.util.Log.e("ViewBiddingActivity", "Error loading seller data for chat: ${exception.message}")
+                    // Navigate with minimal data as fallback
+                    navigateToChat(chatId, sellerId, "User", null)
+                }
+        } catch (e: Exception) {
+            android.util.Log.e("ViewBiddingActivity", "Error in loadSellerDataForChat: ${e.message}")
+            // Navigate with minimal data as fallback
+            navigateToChat(chatId, sellerId, "User", null)
+        }
+    }
+    
     private fun navigateToChat(chatId: String, sellerId: String, sellerName: String = "", sellerAvatar: String? = null) {
         val intent = Intent(this, ChatRoomActivity::class.java)
         intent.putExtra("chatId", chatId)
         intent.putExtra("otherUserId", sellerId)
         intent.putExtra("otherUserName", sellerName)
         intent.putExtra("otherUserAvatar", sellerAvatar)
+        intent.putExtra("item_id", itemId)
         startActivity(intent)
     }
 
