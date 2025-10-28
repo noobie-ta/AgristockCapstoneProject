@@ -1,0 +1,24 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Outer gold circle -->
+    <path
+        android:fillColor="#E5A817"
+        android:pathData="M12,2C6.48,2 2,6.48 2,12s4.48,10 10,10 10,-4.48 10,-10S17.52,2 12,2z"/>
+    <!-- Middle darker gold circle -->
+    <path
+        android:fillColor="#C28800"
+        android:pathData="M12,4C7.58,4 4,7.58 4,12s3.58,8 8,8 8,-3.58 8,-8 -3.58,-8 -8,-8z"/>
+    <!-- Inner bright gold circle -->
+    <path
+        android:fillColor="#FFD54F"
+        android:pathData="M12,6C8.69,6 6,8.69 6,12s2.69,6 6,6 6,-2.69 6,-6 -2.69,-6 -6,-6z"/>
+    <!-- Dollar sign $ -->
+    <path
+        android:fillColor="#C28800"
+        android:pathData="M12.5,8.5h-1.5v1h1c0.83,0 1.5,0.67 1.5,1.5s-0.67,1.5 -1.5,1.5h-1v1h1c0.83,0 1.5,0.67 1.5,1.5s-0.67,1.5 -1.5,1.5h-1v1h-1v-1h-1v-1.5h2v-1h-1c-0.83,0 -1.5,-0.67 -1.5,-1.5s0.67,-1.5 1.5,-1.5h1v-1h-2v-1.5h2v-1h1v1z"/>
+</vector>
+
+
