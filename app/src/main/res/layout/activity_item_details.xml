@@ -64,7 +64,8 @@
             <!-- Image with Indicators -->
             <FrameLayout
                 android:layout_width="match_parent"
-                android:layout_height="220dp">
+                android:layout_height="220dp"
+                android:minHeight="200dp">
 
                 <ImageView
                     android:id="@+id/iv_item_image"
@@ -378,26 +379,32 @@
 
     <!-- Bottom Action Bar -->
     <LinearLayout
+        android:id="@+id/ll_bottom_action_bar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:background="#FFFFFF"
-        android:padding="12dp"
-        android:elevation="4dp">
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="12dp"
+        android:minHeight="64dp"
+        android:elevation="4dp"
+        android:fitsSystemWindows="true">
 
         <TextView
             android:id="@+id/btn_contact_seller"
-            android:layout_width="0dp"
-            android:layout_height="48dp"
-            android:layout_weight="1"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
             android:background="@drawable/button_yellow_background"
             android:gravity="center"
             android:text="Contact Seller"
             android:textColor="#FFFFFF"
-            android:textStyle="bold" />
-
-        <Space android:layout_width="8dp" android:layout_height="1dp" />
-
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:minHeight="56dp"
+            android:clickable="true"
+            android:focusable="true" />
 
     </LinearLayout>
 

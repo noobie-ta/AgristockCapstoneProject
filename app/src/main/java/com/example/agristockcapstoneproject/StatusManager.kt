@@ -37,10 +37,19 @@ class StatusManager private constructor() {
             firestore.collection("users").document(currentUserId)
                 .update(statusData)
                 .addOnSuccessListener {
-                    Log.d("StatusManager", "User status updated: isOnline=$isOnline")
+                    Log.d("StatusManager", "✅ User status updated: isOnline=$isOnline for userId=$currentUserId")
                 }
                 .addOnFailureListener { exception ->
-                    Log.e("StatusManager", "Failed to update user status: ${exception.message}")
+                    Log.e("StatusManager", "❌ Failed to update user status: ${exception.message}")
+                    // If update fails (e.g., document doesn't exist), try to set instead
+                    firestore.collection("users").document(currentUserId)
+                        .set(statusData, com.google.firebase.firestore.SetOptions.merge())
+                        .addOnSuccessListener {
+                            Log.d("StatusManager", "✅ User status set via merge: isOnline=$isOnline")
+                        }
+                        .addOnFailureListener { setException ->
+                            Log.e("StatusManager", "❌ Failed to set user status: ${setException.message}")
+                        }
                 }
         } catch (e: Exception) {
             Log.e("StatusManager", "Error updating user status: ${e.message}")

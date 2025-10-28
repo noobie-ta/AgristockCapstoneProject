@@ -173,6 +173,9 @@ class LiveBiddingActivity : AppCompatActivity() {
 
                 if (snapshot != null) {
                     try {
+                    // Check if bidding has ended before processing bids
+                    checkAndUpdateBiddingStatus()
+                    
                     allBids.clear()
                     topBidders.clear()
                     
@@ -491,6 +494,15 @@ class LiveBiddingActivity : AppCompatActivity() {
         if (timeLeft > 0) {
             countdownTimer = object : CountDownTimer(timeLeft, 1000) {
                 override fun onTick(millisUntilFinished: Long) {
+                    // Check if bidding has ended (in case system time changed or bidding was ended manually)
+                    if (System.currentTimeMillis() >= biddingEndTime) {
+                        cancel()
+                        disableBidding()
+                        countdownText.text = "Bidding Ended"
+                        countdownText.setTextColor(ContextCompat.getColor(this@LiveBiddingActivity, android.R.color.holo_red_dark))
+                        return
+                    }
+                    
                     val days = millisUntilFinished / (1000 * 60 * 60 * 24)
                     val hours = (millisUntilFinished % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)
                     val minutes = (millisUntilFinished % (1000 * 60 * 60)) / (1000 * 60)
@@ -533,12 +545,34 @@ class LiveBiddingActivity : AppCompatActivity() {
         placeBidButton.isEnabled = false
         placeBidButton.alpha = 0.5f
         placeBidButton.text = "Bidding Ended"
+        // Disable the bid amount input as well
+        bidAmountEditText.isEnabled = false
+        bidAmountEditText.alpha = 0.5f
+        bidAmountEditText.hint = "Bidding has ended"
+    }
+    
+    private fun isBiddingEnded(): Boolean {
+        return biddingEndTime > 0 && System.currentTimeMillis() >= biddingEndTime
+    }
+    
+    private fun checkAndUpdateBiddingStatus() {
+        // Periodically check if bidding has ended and update UI accordingly
+        if (isBiddingEnded() && placeBidButton.isEnabled) {
+            disableBidding()
+        }
     }
 
     private fun placeBid() {
         val user = auth.currentUser
         if (user == null) {
             Toast.makeText(this, "Please log in to place a bid", Toast.LENGTH_SHORT).show()
+            return
+        }
+        
+        // Check if bidding has ended
+        if (isBiddingEnded()) {
+            Toast.makeText(this, "Bidding has ended. You can view the results but cannot place new bids.", Toast.LENGTH_LONG).show()
+            disableBidding()
             return
         }
 
@@ -599,6 +633,13 @@ class LiveBiddingActivity : AppCompatActivity() {
     private fun proceedWithBid(bidAmount: Double) {
         val user = auth.currentUser ?: return
         
+        // Check if bidding has ended before proceeding
+        if (isBiddingEnded()) {
+            Toast.makeText(this, "Bidding has ended. You can view the results but cannot place new bids.", Toast.LENGTH_LONG).show()
+            disableBidding()
+            return
+        }
+        
         // Mark as submitting
         isSubmittingBid = true
         
@@ -645,6 +686,13 @@ class LiveBiddingActivity : AppCompatActivity() {
                         startActivity(Intent(this, com.example.agristockcapstoneproject.IdVerificationActivity::class.java))
                     }
                     .setNegativeButton("Cancel", null)
+                    .show()
+            }
+            result.requiresBiddingApproval -> {
+                android.app.AlertDialog.Builder(this)
+                    .setTitle("Bidding Approval Required")
+                    .setMessage("Even though your account is verified, you need separate bidding approval to place bids. ${result.reason}")
+                    .setPositiveButton("OK", null)
                     .show()
             }
             result.requiresActivity -> {

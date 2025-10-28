@@ -126,6 +126,17 @@
             </LinearLayout>
 
 
+            <!-- Seller Rating -->
+            <TextView
+                android:id="@+id/tv_seller_rating"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="Seller: Unknown"
+                android:textColor="@color/text_secondary"
+                android:textSize="10sp"
+                android:fontFamily="sans-serif" />
+
         </LinearLayout>
 
         <!-- Favorite Icon and Count -->

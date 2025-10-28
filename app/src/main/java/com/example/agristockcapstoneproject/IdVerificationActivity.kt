@@ -11,8 +11,10 @@ import android.os.Bundle
 import android.provider.MediaStore
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
+import android.widget.ArrayAdapter
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.AppCompatButton
 import androidx.core.app.ActivityCompat
@@ -36,11 +38,13 @@ class IdVerificationActivity : AppCompatActivity() {
     private lateinit var frontIdPlaceholder: ImageView
     private lateinit var backIdPlaceholder: ImageView
     private lateinit var nextButton: AppCompatButton
+    private lateinit var idTypeSpinner: Spinner
     
     private var frontIdUri: Uri? = null
     private var backIdUri: Uri? = null
     private var isFrontIdUploaded = false
     private var isBackIdUploaded = false
+    private var selectedIdType: String = ""
     
     companion object {
         private const val REQUEST_CODE_FRONT_ID = 1001
@@ -70,8 +74,47 @@ class IdVerificationActivity : AppCompatActivity() {
         frontIdPlaceholder = findViewById(R.id.iv_front_placeholder)
         backIdPlaceholder = findViewById(R.id.iv_back_placeholder)
         nextButton = findViewById(R.id.btn_next)
+        idTypeSpinner = findViewById(R.id.spinner_id_type)
         
         findViewById<ImageView>(R.id.btn_back).setOnClickListener { finish() }
+        
+        setupIdTypeSpinner()
+    }
+    
+    private fun setupIdTypeSpinner() {
+        val idTypes = arrayOf(
+            "Select ID Type",
+            "Driver's License",
+            "Passport",
+            "National ID (PhilSys)",
+            "SSS ID",
+            "TIN ID",
+            "Postal ID",
+            "Voter's ID",
+            "Senior Citizen ID",
+            "PRC ID",
+            "Other Government ID"
+        )
+        
+        val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, idTypes)
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        idTypeSpinner.adapter = adapter
+        
+        idTypeSpinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: android.view.View?, position: Int, id: Long) {
+                if (position > 0) {
+                    selectedIdType = idTypes[position]
+                } else {
+                    selectedIdType = ""
+                }
+                updateNextButton()
+            }
+            
+            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {
+                selectedIdType = ""
+                updateNextButton()
+            }
+        }
     }
     
     private fun setupClickListeners() {
@@ -88,11 +131,17 @@ class IdVerificationActivity : AppCompatActivity() {
         }
         
         nextButton.setOnClickListener {
+            if (selectedIdType.isEmpty()) {
+                Toast.makeText(this, "Please select an ID type", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            
             if (isFrontIdUploaded && isBackIdUploaded) {
                 // Navigate to selfie verification
                 val intent = Intent(this, SelfieVerificationActivity::class.java)
                 intent.putExtra("front_id_uri", frontIdUri.toString())
                 intent.putExtra("back_id_uri", backIdUri.toString())
+                intent.putExtra("id_type", selectedIdType)
                 startActivity(intent)
                 finish()
             } else {
@@ -204,7 +253,7 @@ class IdVerificationActivity : AppCompatActivity() {
     }
     
     private fun updateNextButton() {
-        nextButton.isEnabled = isFrontIdUploaded && isBackIdUploaded
+        nextButton.isEnabled = isFrontIdUploaded && isBackIdUploaded && selectedIdType.isNotEmpty()
         nextButton.alpha = if (nextButton.isEnabled) 1.0f else 0.5f
     }
     
@@ -246,3 +295,4 @@ class IdVerificationActivity : AppCompatActivity() {
         nextButton.alpha = 0.5f
     }
 }
+

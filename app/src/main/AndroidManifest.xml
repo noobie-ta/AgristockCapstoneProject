@@ -39,6 +39,15 @@
             android:name="com.google.android.gms.version"
             android:value="@integer/google_play_services_version" />
 
+        <!-- Firebase Cloud Messaging Service -->
+        <service
+            android:name=".MyFirebaseMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
         <!-- Splash Activity (Launch Activity) -->
         <activity
             android:name=".SplashActivity"
@@ -218,6 +227,84 @@
         <!-- Map Preview Activity -->
         <activity
             android:name=".MapPreviewActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AgristockCapstoneProject" />
+
+        <!-- Bidding Application Activity -->
+        <activity
+            android:name=".BiddingApplicationActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AgristockCapstoneProject" />
+
+        <!-- Bidding Approved Activity -->
+        <activity
+            android:name=".BiddingApprovedActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AgristockCapstoneProject" />
+
+        <!-- Bidding Pending Activity -->
+        <activity
+            android:name=".BiddingPendingActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AgristockCapstoneProject" />
+
+        <!-- Verified Status Activity -->
+        <activity
+            android:name=".VerifiedStatusActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AgristockCapstoneProject" />
+
+        <!-- Verification Pending Activity -->
+        <activity
+            android:name=".VerificationPendingActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AgristockCapstoneProject" />
+
+        <!-- My Purchases Activity -->
+        <activity
+            android:name=".MyPurchasesActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AgristockCapstoneProject" />
+
+        <!-- Notification Settings Activity -->
+        <activity
+            android:name=".NotificationSettingsActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AgristockCapstoneProject" />
+
+        <!-- Visibility Settings Activity -->
+        <activity
+            android:name=".VisibilitySettingsActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AgristockCapstoneProject" />
+
+        <!-- Blocked Users Activity -->
+        <activity
+            android:name=".BlockedUsersActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AgristockCapstoneProject" />
+
+        <!-- Help Center Activity -->
+        <activity
+            android:name=".HelpCenterActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AgristockCapstoneProject" />
+
+        <!-- Contact Support Activity -->
+        <activity
+            android:name=".ContactSupportActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AgristockCapstoneProject" />
+
+        <!-- Verification Rejected Activity -->
+        <activity
+            android:name=".VerificationRejectedActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AgristockCapstoneProject" />
+
+        <!-- Bidding Rejected Activity -->
+        <activity
+            android:name=".BiddingRejectedActivity"
             android:exported="false"
             android:theme="@style/Theme.AgristockCapstoneProject" />
 

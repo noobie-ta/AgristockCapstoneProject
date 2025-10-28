@@ -1,9 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
+    android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="#FFFFFF">
+
+    <!-- Divider Gap Between Header and Menu -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="12dp"
+        android:background="#F5F5F5" />
 
     <!-- Verification -->
     <LinearLayout
@@ -75,7 +81,7 @@
         android:background="#E0E0E0"
         android:layout_marginStart="56dp" />
 
-    <!-- Apply for Bidding -->
+    <!-- Bidding Application -->
     <LinearLayout
         android:id="@+id/menu_apply_bidding"
         android:layout_width="match_parent"
@@ -97,7 +103,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Apply for Bidding"
+            android:text="Bidding Application"
             android:textColor="#000000"
             android:textSize="16sp" />
 
@@ -145,39 +151,42 @@
         android:background="#E0E0E0"
         android:layout_marginStart="56dp" />
 
-    <!-- Logout -->
+    <!-- Spacer to push logout to bottom -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <!-- Logout Button - Bottom Area -->
     <LinearLayout
         android:id="@+id/menu_logout"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
+        android:layout_height="52dp"
         android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:paddingStart="20dp"
-        android:paddingEnd="20dp"
-        android:background="@drawable/logout_button_background"
-        android:layout_margin="12dp"
-        android:elevation="1dp">
+        android:gravity="center"
+        android:paddingStart="24dp"
+        android:paddingEnd="24dp"
+        android:background="@drawable/logout_button_modern"
+        android:layout_margin="16dp"
+        android:elevation="3dp">
 
         <ImageView
-            android:layout_width="20dp"
-            android:layout_height="20dp"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
             android:src="@drawable/ic_logout"
             android:layout_marginEnd="12dp"
             android:tint="#FFFFFF" />
 
         <TextView
-            android:layout_width="0dp"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
             android:text="Logout"
             android:textColor="#FFFFFF"
             android:textSize="16sp"
-            android:textStyle="bold" />
+            android:textStyle="bold"
+            android:fontFamily="sans-serif-medium" />
 
     </LinearLayout>
 
 </LinearLayout>
-
-
-
 

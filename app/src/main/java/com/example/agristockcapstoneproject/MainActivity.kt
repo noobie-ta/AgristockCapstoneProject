@@ -2,7 +2,10 @@ package com.example.agristockcapstoneproject
 
 import android.content.Intent
 import android.content.SharedPreferences
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.ImageView
@@ -10,6 +13,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.GravityCompat
 import androidx.core.view.WindowCompat
@@ -20,6 +24,8 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
+import com.google.firebase.firestore.SetOptions
+import com.google.firebase.messaging.FirebaseMessaging
 import com.bumptech.glide.Glide
 
 class MainActivity : AppCompatActivity() {
@@ -36,6 +42,8 @@ class MainActivity : AppCompatActivity() {
     private var isListView = true
     private var notificationsListener: ListenerRegistration? = null
     private var messagesListener: ListenerRegistration? = null
+    private var blockedUsersListener: ListenerRegistration? = null
+    private val blockedUserIds = mutableSetOf<String>() // Cache of blocked user IDs
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -51,6 +59,50 @@ class MainActivity : AppCompatActivity() {
         drawerLayout = binding.drawerLayout
         sharedPreferences = getSharedPreferences("homepage_filters", MODE_PRIVATE)
         
+        // Check if user is verified (exists in Firestore) before allowing access
+        checkUserVerification()
+    }
+    
+    private fun checkUserVerification() {
+        val currentUser = auth.currentUser
+        if (currentUser == null) {
+            // No user signed in, go to login
+            startActivity(Intent(this, com.example.agristockcapstoneproject.login.LoginActivity::class.java))
+            finish()
+            return
+        }
+        
+        // Check if user exists in Firestore (OTP verified)
+        firestore.collection("users").document(currentUser.uid)
+            .get()
+            .addOnSuccessListener { document ->
+                if (document.exists()) {
+                    // User is verified, proceed with app initialization
+                    initializeApp()
+                } else {
+                    // User not verified, redirect to OTP verification
+                    android.util.Log.d("MainActivity", "User not verified, redirecting to EmailVerificationActivity")
+                    val intent = Intent(this, com.example.agristockcapstoneproject.login.EmailVerificationActivity::class.java)
+                    intent.putExtra("email", currentUser.email ?: "")
+                    intent.putExtra("firstName", currentUser.displayName?.substringBefore(' ') ?: "")
+                    intent.putExtra("lastName", currentUser.displayName?.substringAfter(' ', "") ?: "")
+                    startActivity(intent)
+                    finish()
+                }
+            }
+            .addOnFailureListener { e ->
+                android.util.Log.e("MainActivity", "Error checking user verification: ${e.message}")
+                // On error, assume not verified and redirect
+                val intent = Intent(this, com.example.agristockcapstoneproject.login.EmailVerificationActivity::class.java)
+                intent.putExtra("email", currentUser.email ?: "")
+                intent.putExtra("firstName", currentUser.displayName?.substringBefore(' ') ?: "")
+                intent.putExtra("lastName", currentUser.displayName?.substringAfter(' ', "") ?: "")
+                startActivity(intent)
+                finish()
+            }
+    }
+    
+    private fun initializeApp() {
         // Load saved filter state
         loadFilterState()
         
@@ -62,6 +114,7 @@ class MainActivity : AppCompatActivity() {
         setupMessagesBadge()
         setupWelcomeUsername()
         setupModernFilters()
+        loadBlockedUsers()
         displayPosts()
         
         // Initialize badges to hidden state
@@ -69,6 +122,62 @@ class MainActivity : AppCompatActivity() {
 
         // Ensure initial active state reflects Home
         setActiveNavItem(binding.navHome)
+        
+        // Request notification permission and setup FCM token
+        requestNotificationPermission()
+        setupFCMToken()
+    }
+    
+    private fun loadBlockedUsers() {
+        val currentUser = auth.currentUser ?: return
+        
+        // Load users that current user has blocked AND users who have blocked current user (bidirectional)
+        blockedUsersListener = firestore.collection("blocks")
+            .whereEqualTo("blockerId", currentUser.uid)
+            .addSnapshotListener { snapshot1, exception1 ->
+                if (exception1 != null) {
+                    android.util.Log.e("MainActivity", "Error loading blocked users: ${exception1.message}")
+                    return@addSnapshotListener
+                }
+                
+                blockedUserIds.clear()
+                snapshot1?.documents?.forEach { doc ->
+                    val blockedUserId = doc.getString("blockedUserId")
+                    if (!blockedUserId.isNullOrEmpty()) {
+                        blockedUserIds.add(blockedUserId)
+                    }
+                }
+                
+                // Also check users who have blocked the current user (bidirectional)
+                firestore.collection("blocks")
+                    .whereEqualTo("blockedUserId", currentUser.uid)
+                    .get()
+                    .addOnSuccessListener { snapshot2 ->
+                        snapshot2?.documents?.forEach { doc ->
+                            val blockerId = doc.getString("blockerId")
+                            if (!blockerId.isNullOrEmpty()) {
+                                blockedUserIds.add(blockerId)
+                            }
+                        }
+                        
+                        android.util.Log.d("MainActivity", "Loaded ${blockedUserIds.size} blocked users (bidirectional)")
+                        // Refresh posts when blocked users list updates
+                        displayPosts()
+                    }
+                    .addOnFailureListener { exception2 ->
+                        android.util.Log.e("MainActivity", "Error loading users who blocked current user: ${exception2.message}")
+                        android.util.Log.d("MainActivity", "Loaded ${blockedUserIds.size} blocked users (one-way)")
+                        displayPosts()
+                    }
+            }
+    }
+    
+    override fun onDestroy() {
+        super.onDestroy()
+        postsListener?.remove()
+        notificationsListener?.remove()
+        messagesListener?.remove()
+        blockedUsersListener?.remove()
     }
 
     private fun setupSwipeRefresh() {
@@ -204,7 +313,7 @@ class MainActivity : AppCompatActivity() {
         // Menu items
         findViewById<LinearLayout>(R.id.menu_verification).setOnClickListener {
             drawerLayout.closeDrawer(GravityCompat.START)
-            startActivity(Intent(this, IdVerificationActivity::class.java))
+            checkVerificationStatusAndNavigate()
         }
 
         findViewById<LinearLayout>(R.id.menu_settings).setOnClickListener {
@@ -214,7 +323,7 @@ class MainActivity : AppCompatActivity() {
 
         findViewById<LinearLayout>(R.id.menu_apply_bidding).setOnClickListener {
             drawerLayout.closeDrawer(GravityCompat.START)
-            Toast.makeText(this, "Apply for Bidding feature coming soon!", Toast.LENGTH_SHORT).show()
+            checkBiddingApprovalAndNavigate()
         }
 
         findViewById<LinearLayout>(R.id.menu_my_purchases).setOnClickListener {
@@ -246,27 +355,43 @@ class MainActivity : AppCompatActivity() {
         val user = auth.currentUser
         val usernameText = findViewById<TextView>(R.id.tv_username)
         val profilePicture = findViewById<ImageView>(R.id.iv_profile_picture)
+        val verificationBadgeLayout = findViewById<LinearLayout>(R.id.ll_verification_badge)
+        val verificationStatusText = findViewById<TextView>(R.id.tv_verification_status)
+        val verifiedBadgeIcon = findViewById<ImageView>(R.id.iv_verified_badge_icon)
+        val biddingBadgeLayout = findViewById<LinearLayout>(R.id.ll_bidding_badge)
+        val biddingStatusText = findViewById<TextView>(R.id.tv_bidding_status)
         
         if (user != null) {
-            // First set the username from Firebase Auth
-            usernameText.text = user.displayName ?: "User"
+            // Clear username first to prevent showing stale data, will be updated when Firestore data loads
+            usernameText.text = ""
             
-            // Load user data from Firestore
+            // Load user data from Firestore (use Source.SERVER to bypass cache)
             firestore.collection("users").document(user.uid)
-                .get()
+                .get(com.google.firebase.firestore.Source.SERVER)
                 .addOnSuccessListener { document ->
                     if (document.exists()) {
                         val username = document.getString("username")
                         val avatarUrl = document.getString("avatarUrl")
                         
-                        // Update username if available from Firestore
-                        if (!username.isNullOrEmpty()) {
-                            usernameText.text = username
+                        val verificationStatus = document.getString("verificationStatus")?.trim()?.lowercase() ?: "not_verified"
+                        val biddingApprovalStatus = document.getString("biddingApprovalStatus")?.trim()?.lowercase() ?: "not_applied"
+                        
+                        // Security: Remove password field if it exists (passwords should only be in Firebase Auth)
+                        if (document.contains("password")) {
+                            firestore.collection("users").document(user.uid)
+                                .update(mapOf("password" to com.google.firebase.firestore.FieldValue.delete()))
+                                .addOnFailureListener { /* Silently fail */ }
+                        }
+                        
+                        // Update username from Firestore (preferred), fallback to displayName, then "User"
+                        usernameText.text = when {
+                            !username.isNullOrEmpty() -> username
+                            !user.displayName.isNullOrEmpty() -> user.displayName
+                            else -> "User"
                         }
                         
                         // Load profile picture
                         if (!avatarUrl.isNullOrEmpty()) {
-                            android.util.Log.d("MainActivity", "Loading profile picture: $avatarUrl")
                             Glide.with(this)
                                 .load(avatarUrl)
                                 .circleCrop()
@@ -274,24 +399,245 @@ class MainActivity : AppCompatActivity() {
                                 .error(R.drawable.ic_profile)
                                 .into(profilePicture)
                         } else {
-                            android.util.Log.d("MainActivity", "No avatar URL found, using default")
                             profilePicture.setImageResource(R.drawable.ic_profile)
                         }
+                        
+                        // Update verification badge
+                        when (verificationStatus) {
+                            "approved" -> {
+                                verifiedBadgeIcon.visibility = android.view.View.VISIBLE
+                                verificationStatusText.text = "Verified"
+                                verificationStatusText.setTextColor(ContextCompat.getColor(this, android.R.color.holo_blue_dark))
+                                verificationBadgeLayout.setBackgroundResource(R.drawable.badge_verified_background)
+                            }
+                            "pending" -> {
+                                verifiedBadgeIcon.visibility = android.view.View.GONE
+                                verificationStatusText.text = "Pending ⏳"
+                                verificationStatusText.setTextColor(ContextCompat.getColor(this, android.R.color.holo_orange_dark))
+                                verificationBadgeLayout.setBackgroundResource(R.drawable.badge_not_verified_background)
+                            }
+                            "rejected" -> {
+                                verifiedBadgeIcon.visibility = android.view.View.GONE
+                                verificationStatusText.text = "Rejected ❌"
+                                verificationStatusText.setTextColor(ContextCompat.getColor(this, android.R.color.holo_red_dark))
+                                verificationBadgeLayout.setBackgroundResource(R.drawable.badge_not_verified_background)
+                            }
+                            else -> {
+                                verifiedBadgeIcon.visibility = android.view.View.GONE
+                                verificationStatusText.text = "Not Verified ⚪"
+                                verificationStatusText.setTextColor(ContextCompat.getColor(this, android.R.color.darker_gray))
+                                verificationBadgeLayout.setBackgroundResource(R.drawable.badge_not_verified_background)
+                            }
+                        }
+                        
+                        // Update bidding badge (already lowercase from above)
+                        when (biddingApprovalStatus) {
+                            "approved" -> {
+                                biddingStatusText.text = "Approved Bidder 🎯"
+                                biddingStatusText.setTextColor(ContextCompat.getColor(this, android.R.color.holo_green_dark))
+                                biddingBadgeLayout.setBackgroundResource(R.drawable.badge_bidder_background)
+                            }
+                            "pending" -> {
+                                biddingStatusText.text = "Bidding Pending ⏳"
+                                biddingStatusText.setTextColor(ContextCompat.getColor(this, android.R.color.holo_orange_dark))
+                                biddingBadgeLayout.setBackgroundResource(R.drawable.badge_not_bidder_background)
+                            }
+                            "rejected", "banned" -> {
+                                biddingStatusText.text = "Bidding Rejected ❌"
+                                biddingStatusText.setTextColor(ContextCompat.getColor(this, android.R.color.holo_red_dark))
+                                biddingBadgeLayout.setBackgroundResource(R.drawable.badge_not_bidder_background)
+                            }
+                            else -> {
+                                biddingStatusText.text = "Not a Bidder ⚪"
+                                biddingStatusText.setTextColor(ContextCompat.getColor(this, android.R.color.darker_gray))
+                                biddingBadgeLayout.setBackgroundResource(R.drawable.badge_not_bidder_background)
+                            }
+                        }
                     } else {
-                        android.util.Log.w("MainActivity", "User document not found in Firestore")
+                        // Document doesn't exist - use displayName or fallback
+                        usernameText.text = user.displayName ?: "User"
                         profilePicture.setImageResource(R.drawable.ic_profile)
+                        setDefaultBadges(verificationBadgeLayout, verificationStatusText, biddingBadgeLayout, biddingStatusText)
                     }
                 }
                 .addOnFailureListener { exception ->
-                    android.util.Log.e("MainActivity", "Error loading user info: ${exception.message}")
+                    // On error, use displayName or fallback
+                    usernameText.text = user.displayName ?: "User"
                     profilePicture.setImageResource(R.drawable.ic_profile)
+                    setDefaultBadges(verificationBadgeLayout, verificationStatusText, biddingBadgeLayout, biddingStatusText)
                 }
         } else {
             usernameText.text = "Guest"
             profilePicture.setImageResource(R.drawable.ic_profile)
+            setDefaultBadges(verificationBadgeLayout, verificationStatusText, biddingBadgeLayout, biddingStatusText)
         }
     }
-
+    
+    private fun setDefaultBadges(
+        verificationBadgeLayout: LinearLayout,
+        verificationStatusText: TextView,
+        biddingBadgeLayout: LinearLayout,
+        biddingStatusText: TextView
+    ) {
+        findViewById<ImageView>(R.id.iv_verified_badge_icon)?.visibility = android.view.View.GONE
+        verificationStatusText.text = "Not Verified ⚪"
+        verificationStatusText.setTextColor(ContextCompat.getColor(this, android.R.color.darker_gray))
+        verificationBadgeLayout.setBackgroundResource(R.drawable.badge_not_verified_background)
+        
+        biddingStatusText.text = "Not a Bidder ⚪"
+        biddingStatusText.setTextColor(ContextCompat.getColor(this, android.R.color.darker_gray))
+        biddingBadgeLayout.setBackgroundResource(R.drawable.badge_not_bidder_background)
+    }
+    
+    private fun checkVerificationStatusAndNavigate() {
+        val currentUser = auth.currentUser
+        if (currentUser == null) {
+            Toast.makeText(this, "Please log in first", Toast.LENGTH_SHORT).show()
+            return
+        }
+        
+        firestore.collection("users").document(currentUser.uid)
+            .get(com.google.firebase.firestore.Source.SERVER)
+            .addOnSuccessListener { document ->
+                if (document.exists()) {
+                    val verificationStatus = document.getString("verificationStatus")?.trim()?.lowercase() ?: "not_verified"
+                    
+                    when (verificationStatus) {
+                        "approved" -> {
+                            // User is already verified, show verified status page
+                            val intent = Intent(this, VerifiedStatusActivity::class.java)
+                            startActivity(intent)
+                        }
+                        "pending" -> {
+                            // Verification is pending - show pending page
+                            val intent = Intent(this, VerificationPendingActivity::class.java)
+                            startActivity(intent)
+                        }
+                        "rejected" -> {
+                            // Verification was rejected - check cooldown and navigate to rejected page
+                            checkVerificationCooldown()
+                        }
+                        else -> {
+                            // Not verified yet - start verification process, go directly to ID verification
+                            val intent = Intent(this, IdVerificationActivity::class.java)
+                            startActivity(intent)
+                        }
+                    }
+                } else {
+                    Toast.makeText(this, "User profile not found", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .addOnFailureListener { exception ->
+                Toast.makeText(this, "Error checking verification status", Toast.LENGTH_SHORT).show()
+            }
+    }
+    
+    private fun checkBiddingApprovalAndNavigate() {
+        val currentUser = auth.currentUser
+        if (currentUser == null) {
+            Toast.makeText(this, "Please log in first", Toast.LENGTH_SHORT).show()
+            return
+        }
+        
+        firestore.collection("users").document(currentUser.uid)
+            .get(com.google.firebase.firestore.Source.SERVER)
+            .addOnSuccessListener { document ->
+                if (document.exists()) {
+                    val biddingApprovalStatus = document.getString("biddingApprovalStatus")?.trim()?.lowercase() ?: "not_applied"
+                    
+                    when (biddingApprovalStatus) {
+                        "approved" -> {
+                            // User is already approved, show approved page
+                            val intent = Intent(this, BiddingApprovedActivity::class.java)
+                            startActivity(intent)
+                        }
+                        "pending" -> {
+                            // Application is pending - show pending page
+                            val intent = Intent(this, BiddingPendingActivity::class.java)
+                            startActivity(intent)
+                        }
+                        "rejected", "banned" -> {
+                            // Bidding application was rejected - check cooldown and navigate to rejected page
+                            checkBiddingCooldown()
+                        }
+                        else -> {
+                            // Not applied yet - navigate to bidding application form
+                            val intent = Intent(this, BiddingApplicationActivity::class.java)
+                            startActivity(intent)
+                        }
+                    }
+                } else {
+                    Toast.makeText(this, "User profile not found", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .addOnFailureListener { exception ->
+                Toast.makeText(this, "Error checking bidding status", Toast.LENGTH_SHORT).show()
+            }
+    }
+    
+    private fun checkVerificationCooldown() {
+        val currentUser = auth.currentUser
+        if (currentUser == null) {
+            Toast.makeText(this, "Please log in first", Toast.LENGTH_SHORT).show()
+            return
+        }
+        
+        firestore.collection("users").document(currentUser.uid)
+            .get()
+            .addOnSuccessListener { document ->
+                if (document.exists()) {
+                    val cooldownEnd = document.getLong("verificationCooldownEnd") ?: 0L
+                    val now = System.currentTimeMillis()
+                    
+                    if (now < cooldownEnd) {
+                        // Still in cooldown - show rejected page
+                        val intent = Intent(this, VerificationRejectedActivity::class.java)
+                        startActivity(intent)
+                    } else {
+                        // Cooldown expired - allow resubmission
+                        val intent = Intent(this, IdVerificationActivity::class.java)
+                        startActivity(intent)
+                    }
+                }
+            }
+            .addOnFailureListener { exception ->
+                // On error, show rejected page
+                val intent = Intent(this, VerificationRejectedActivity::class.java)
+                startActivity(intent)
+            }
+    }
+    
+    private fun checkBiddingCooldown() {
+        val currentUser = auth.currentUser
+        if (currentUser == null) {
+            Toast.makeText(this, "Please log in first", Toast.LENGTH_SHORT).show()
+            return
+        }
+        
+        firestore.collection("users").document(currentUser.uid)
+            .get()
+            .addOnSuccessListener { document ->
+                if (document.exists()) {
+                    val cooldownEnd = document.getLong("biddingCooldownEnd") ?: 0L
+                    val now = System.currentTimeMillis()
+                    
+                    if (now < cooldownEnd) {
+                        // Still in cooldown - show rejected page
+                        val intent = Intent(this, BiddingRejectedActivity::class.java)
+                        startActivity(intent)
+                    } else {
+                        // Cooldown expired - allow resubmission
+                        val intent = Intent(this, BiddingApplicationActivity::class.java)
+                        startActivity(intent)
+                    }
+                }
+            }
+            .addOnFailureListener { exception ->
+                // On error, show rejected page
+                val intent = Intent(this, BiddingRejectedActivity::class.java)
+                startActivity(intent)
+            }
+    }
 
     private fun setViewOption(isList: Boolean) {
         isListView = isList
@@ -369,14 +715,26 @@ class MainActivity : AppCompatActivity() {
                     true
                 }
                 
-                val posts = availableDocs.map { doc ->
+                val currentUserId = auth.currentUser?.uid
+                
+                val posts = availableDocs.mapNotNull { doc ->
+                    val sellerId = doc.getString("userId") ?: ""
+                    
+                    // Filter out posts from blocked users (bidirectional check)
+                    if (currentUserId != null) {
+                        // Skip if current user blocked this seller
+                        if (blockedUserIds.contains(sellerId)) {
+                            return@mapNotNull null
+                        }
+                    }
+                    
                     Post(
                         id = doc.id,
                         name = doc.getString("title") ?: "",
                         price = doc.getString("price") ?: "",
                         time = doc.getString("datePosted") ?: "",
                         type = doc.getString("type") ?: "SELL",
-                        sellerId = doc.getString("userId") ?: "",
+                        sellerId = sellerId,
                         sellerName = doc.getString("sellerName") ?: "",
                         saleTradeType = doc.getString("saleTradeType") ?: "SALE",
                         category = doc.getString("category") ?: ""
@@ -600,13 +958,10 @@ class MainActivity : AppCompatActivity() {
                         ?.ifEmpty { document.getString("displayName") ?: "User" }
                         ?: "User"
                     
-                    val isVerified = verificationStatus == "approved"
-                    val verifiedTag = if (isVerified) " ✅ Verified Seller" else ""
-                    
                     val displayText = if (totalRatings > 0 && rating > 0) {
-                        "Seller: $sellerName$verifiedTag (${String.format("%.1f", rating)}★)"
+                        "Seller: $sellerName (${String.format("%.1f", rating)}★)"
                     } else {
-                        "Seller: $sellerName$verifiedTag (No rating yet ⭐)"
+                        "Seller: $sellerName (No rating yet ⭐)"
                     }
                     ratingTextView.text = displayText
                 } else {
@@ -868,6 +1223,8 @@ class MainActivity : AppCompatActivity() {
         // Re-setup badges to get fresh data
         setupNotificationBadge()
         setupMessagesBadge()
+        // Refresh user info badges (verification and bidding status)
+        loadUserInfo()
     }
     
     fun clearNotificationBadge() {
@@ -1122,6 +1479,80 @@ class MainActivity : AppCompatActivity() {
             putString("current_filter", currentFilter)
             putString("current_category", currentCategory)
             apply()
+        }
+    }
+    
+    // ✅ PUSH NOTIFICATION SETUP
+    private fun requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED) {
+                // Request permission
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(android.Manifest.permission.POST_NOTIFICATIONS),
+                    1001
+                )
+            } else {
+                Log.d("MainActivity", "Notification permission already granted")
+            }
+        }
+    }
+    
+    private fun setupFCMToken() {
+        val currentUser = auth.currentUser
+        if (currentUser == null) {
+            Log.d("FCM", "User not logged in, skipping FCM token setup")
+            return
+        }
+        
+        FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+            if (!task.isSuccessful) {
+                Log.e("FCM", "Failed to get FCM token: ${task.exception?.message}")
+                return@addOnCompleteListener
+            }
+            
+            val token = task.result
+            Log.d("FCM", "FCM token retrieved: $token")
+            saveFCMTokenToFirestore(token)
+        }
+    }
+    
+    private fun saveFCMTokenToFirestore(token: String) {
+        val currentUser = auth.currentUser
+        if (currentUser == null) {
+            Log.w("FCM", "Cannot save token: User not logged in")
+            return
+        }
+        
+        val tokenData = hashMapOf(
+            "fcmToken" to token,
+            "fcmTokenUpdatedAt" to com.google.firebase.Timestamp.now()
+        )
+        
+        firestore.collection("users").document(currentUser.uid)
+            .set(tokenData, SetOptions.merge())
+            .addOnSuccessListener {
+                Log.d("FCM", "FCM token saved successfully to Firestore")
+            }
+            .addOnFailureListener { exception ->
+                Log.e("FCM", "Failed to save FCM token to Firestore: ${exception.message}")
+            }
+    }
+    
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == 1001) {
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                Log.d("MainActivity", "Notification permission granted")
+                setupFCMToken()
+            } else {
+                Log.d("MainActivity", "Notification permission denied")
+            }
         }
     }
     

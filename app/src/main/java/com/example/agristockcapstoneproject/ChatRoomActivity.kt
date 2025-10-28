@@ -2,11 +2,13 @@ package com.example.agristockcapstoneproject
 
 import android.Manifest
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import android.provider.MediaStore
+import android.view.inputmethod.InputMethodManager
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.LayoutInflater
@@ -18,7 +20,9 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
@@ -82,6 +86,7 @@ class ChatRoomActivity : AppCompatActivity() {
     private val storage: FirebaseStorage by lazy { FirebaseStorage.getInstance() }
     private var messagesListener: ListenerRegistration? = null
     private var statusListener: ListenerRegistration? = null
+    private var postStatusListener: ListenerRegistration? = null // Listener for post status changes
     
     private var chatId: String = ""
     private var otherUserId: String = ""
@@ -120,17 +125,26 @@ class ChatRoomActivity : AppCompatActivity() {
         // Debug logging
         android.util.Log.d("ChatRoomActivity", "Intent data - chatId: $chatId, otherUserId: $otherUserId, otherUserName: $otherUserName, otherUserAvatar: $otherUserAvatar")
 
-            initializeViews()
-            setupClickListeners()
-            loadMessages()
-            loadUserStatus()
-            loadItemInfo()
-            
-            try {
-            StatusManager.getInstance().setOnline()
-            } catch (e: Exception) {
-                android.util.Log.e("ChatRoomActivity", "Error setting online status: ${e.message}")
+            // Check if either user has blocked the other before proceeding
+            com.example.agristockcapstoneproject.utils.BlockingUtils.checkIfBlocked(
+                auth.currentUser?.uid ?: "",
+                otherUserId
+            ) { isBlocked ->
+                if (isBlocked) {
+                    Toast.makeText(this, "You cannot chat with this user. They have been blocked.", Toast.LENGTH_LONG).show()
+                    finish()
+                    return@checkIfBlocked
+                }
+                
+                initializeViews()
+                setupClickListeners()
+                setupWindowInsets()
+                loadMessages()
+                loadUserStatus()
+                loadItemInfo()
             }
+            
+            // Note: Online status is now handled globally by AgriStockApplication
             
             // Ensure Mark as Sold button visibility is checked
             try {
@@ -194,26 +208,27 @@ class ChatRoomActivity : AppCompatActivity() {
             val tvUsername = findViewById<TextView>(R.id.tv_username) ?: throw IllegalStateException("tv_username not found")
             val ivAvatar = findViewById<ImageView>(R.id.iv_avatar) ?: throw IllegalStateException("iv_avatar not found")
             
-        // Set username and avatar, with fallback to load from Firestore if needed
+        // Set initial username from intent, then always load fresh data from Firestore
         if (otherUserName.isNotEmpty() && otherUserName != "User") {
             tvUsername.text = otherUserName
         } else {
             tvUsername.text = "Loading..."
-            loadUserData()
         }
+        
+        // Always load user data from Firestore to ensure correct username
+        loadUserData()
             
-            if (!otherUserAvatar.isNullOrEmpty()) {
-                Glide.with(this)
-                    .load(otherUserAvatar)
-                    .circleCrop()
-                    .placeholder(R.drawable.ic_profile)
-                    .error(R.drawable.ic_profile)
-                    .into(ivAvatar)
-            } else {
-                ivAvatar.setImageResource(R.drawable.ic_profile)
-                // Load user data to get avatar
-                loadUserData()
-            }
+        // Load avatar if available
+        if (!otherUserAvatar.isNullOrEmpty()) {
+            Glide.with(this)
+                .load(otherUserAvatar)
+                .circleCrop()
+                .placeholder(R.drawable.ic_profile)
+                .error(R.drawable.ic_profile)
+                .into(ivAvatar)
+        } else {
+            ivAvatar.setImageResource(R.drawable.ic_profile)
+        }
             
             recyclerView.layoutManager = LinearLayoutManager(this)
             // Initialize empty adapter to prevent null pointer issues
@@ -227,10 +242,15 @@ class ChatRoomActivity : AppCompatActivity() {
     
     private fun loadItemInfo() {
         // Get item ID from intent or chat data
-        itemId = intent.getStringExtra("item_id")
+        if (itemId == null) {
+            itemId = intent.getStringExtra("item_id")
+        }
         val currentItemId = itemId
         android.util.Log.d("ChatRoomActivity", "Loading item info for itemId: $currentItemId")
         if (currentItemId != null && currentItemId.isNotEmpty()) {
+            // Set up real-time listener for post status changes
+            setupPostStatusListener(currentItemId)
+            
             firestore.collection("posts").document(currentItemId)
                 .get()
                 .addOnSuccessListener { document ->
@@ -242,9 +262,10 @@ class ChatRoomActivity : AppCompatActivity() {
                             val location = data["location"]?.toString() ?: ""
                             val imageUrl = data["imageUrl"]?.toString()
                             val postType = data["type"]?.toString() ?: "SELL"
+                            val status = data["status"]?.toString() ?: "FOR SALE"
                             
                             // Show item info card
-                            android.util.Log.d("ChatRoomActivity", "Showing item info card with title: $title, price: $price, type: $postType")
+                            android.util.Log.d("ChatRoomActivity", "Showing item info card with title: $title, price: $price, type: $postType, status: $status")
                             itemInfoCard.visibility = View.VISIBLE
                             itemTitle.text = title
                             itemPrice.text = price
@@ -284,11 +305,14 @@ class ChatRoomActivity : AppCompatActivity() {
                                 }
                             }
                             
+                            // Update UI based on current status
+                            updateUIForPostStatus(status)
+                            
                             // Check if Mark as Sold button should be visible
                             checkMarkSoldVisibility()
                             
-                            // Note: Rate Seller visibility is checked only once in onCreate, not here
-                            // to avoid repeated Firestore queries on every message update
+                            // Check Rate Seller visibility when item info loads
+                            checkRateSellerVisibility()
                         }
                     } else {
                         // Item not found or deleted
@@ -343,6 +367,128 @@ class ChatRoomActivity : AppCompatActivity() {
                 sendButton.alpha = if (sendButton.isEnabled) 1.0f else 0.5f
             }
         })
+        
+        // Scroll to bottom when EditText gains focus (keyboard opens)
+        messageInput.setOnFocusChangeListener { view, hasFocus ->
+            if (hasFocus) {
+                // Post a delayed scroll to ensure keyboard animation completes
+                recyclerView.postDelayed({
+                    scrollToBottom()
+                }, 200)
+            }
+        }
+        
+        // Also handle click events to ensure keyboard shows
+        messageInput.setOnClickListener {
+            // Request focus to show keyboard
+            messageInput.requestFocus()
+            // Show keyboard explicitly
+            val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+            imm.showSoftInput(messageInput, InputMethodManager.SHOW_IMPLICIT)
+            // Scroll to bottom after a short delay
+            recyclerView.postDelayed({
+                scrollToBottom()
+            }, 250)
+        }
+    }
+    
+    private fun setupWindowInsets() {
+        val messageInputContainer = findViewById<View>(R.id.ll_message_input)
+        val headerLayout = findViewById<View>(R.id.ll_header)
+        val recyclerView = findViewById<RecyclerView>(R.id.rv_messages)
+        
+        // Handle header - add status bar insets to top padding
+        if (headerLayout != null) {
+            val originalHeaderTopPadding = 12 // Store original value from XML (12dp)
+            val originalHeaderLeftPadding = headerLayout.paddingLeft
+            val originalHeaderRightPadding = headerLayout.paddingRight
+            val originalHeaderBottomPadding = headerLayout.paddingBottom
+            
+            ViewCompat.setOnApplyWindowInsetsListener(headerLayout) { view, insets ->
+                val statusBarInsets = insets.getInsets(WindowInsetsCompat.Type.statusBars())
+                
+                // Convert dp to pixels for consistency
+                val topPaddingDp = originalHeaderTopPadding
+                val topPaddingPx = (topPaddingDp * resources.displayMetrics.density).toInt()
+                
+                // Add status bar height to original top padding (minimum 12dp padding + status bar)
+                val finalTopPadding = topPaddingPx + statusBarInsets.top
+                
+                view.setPadding(
+                    originalHeaderLeftPadding,
+                    finalTopPadding,
+                    originalHeaderRightPadding,
+                    originalHeaderBottomPadding
+                )
+                
+                insets
+            }
+        }
+        
+        // Handle message input container - add keyboard insets to bottom padding
+        if (messageInputContainer != null) {
+            // Store original padding values from layout XML (12dp = padding)
+            val originalTopPadding = messageInputContainer.paddingTop
+            val originalLeftPadding = messageInputContainer.paddingLeft
+            val originalRightPadding = messageInputContainer.paddingRight
+            val originalBottomPadding = 12 // Store original value from XML (12dp)
+            
+            ViewCompat.setOnApplyWindowInsetsListener(messageInputContainer) { view, insets ->
+                // Get both keyboard (IME) and navigation bar insets
+                val imeInsets = insets.getInsets(WindowInsetsCompat.Type.ime())
+                val navigationBarInsets = insets.getInsets(WindowInsetsCompat.Type.navigationBars())
+                
+                // Convert dp to pixels for bottom padding
+                val bottomPaddingDp = originalBottomPadding
+                val bottomPaddingPx = (bottomPaddingDp * resources.displayMetrics.density).toInt()
+                
+                // Use keyboard height if present, otherwise use navigation bar height
+                // Add to original bottom padding (minimum 12dp + insets)
+                val finalBottomPadding = if (imeInsets.bottom > 0) {
+                    // Keyboard is open - add keyboard height to original bottom padding
+                    bottomPaddingPx + imeInsets.bottom
+                } else {
+                    // Keyboard is closed - use navigation bar height if present, otherwise just original padding
+                    bottomPaddingPx + navigationBarInsets.bottom.coerceAtLeast(0)
+                }
+                
+                // Set padding using original values and adding bottom inset
+                view.setPadding(
+                    originalLeftPadding,
+                    originalTopPadding,
+                    originalRightPadding,
+                    finalBottomPadding.coerceAtLeast(bottomPaddingPx) // Ensure minimum padding
+                )
+                
+                // Scroll RecyclerView to bottom when keyboard appears
+                if (imeInsets.bottom > 0 && recyclerView != null) {
+                    recyclerView.postDelayed({
+                        val layoutManager = recyclerView.layoutManager as? LinearLayoutManager
+                        if (layoutManager != null && messages.isNotEmpty()) {
+                            val lastPosition = messages.size - 1
+                            layoutManager.scrollToPositionWithOffset(lastPosition, 0)
+                        }
+                    }, 150)
+                }
+                
+                insets
+            }
+        }
+        
+        // Request window insets to be applied immediately (fixes initial UI layout)
+        // Use the root view to ensure all child views get insets
+        val rootView = findViewById<View>(android.R.id.content)
+        rootView?.post {
+            ViewCompat.requestApplyInsets(rootView)
+        }
+        
+        // Also request directly on the views to ensure they get insets
+        headerLayout?.post {
+            ViewCompat.requestApplyInsets(headerLayout)
+        }
+        messageInputContainer?.post {
+            ViewCompat.requestApplyInsets(messageInputContainer)
+        }
     }
 
     private fun loadMessages() {
@@ -625,13 +771,21 @@ class ChatRoomActivity : AppCompatActivity() {
     private fun sendTextMessage(messageText: String) {
         val currentUserId = auth.currentUser?.uid ?: return
         
-        // Check if we need to reactivate chat for the receiver before sending message
-        checkAndReactivateChatIfNeeded { success ->
-            if (success) {
-                // Proceed with sending the message
-                sendTextMessageInternal(messageText)
-            } else {
-                Toast.makeText(this, "Failed to prepare chat for message", Toast.LENGTH_SHORT).show()
+        // Check if either user has blocked the other (bidirectional)
+        com.example.agristockcapstoneproject.utils.BlockingUtils.checkIfBlocked(currentUserId, otherUserId) { isBlocked ->
+            if (isBlocked) {
+                Toast.makeText(this, "Cannot send message. This user has been blocked.", Toast.LENGTH_LONG).show()
+                return@checkIfBlocked
+            }
+            
+            // Check if we need to reactivate chat for the receiver before sending message
+            checkAndReactivateChatIfNeeded { success ->
+                if (success) {
+                    // Proceed with sending the message
+                    sendTextMessageInternal(messageText)
+                } else {
+                    Toast.makeText(this, "Failed to prepare chat for message", Toast.LENGTH_SHORT).show()
+                }
             }
         }
     }
@@ -998,12 +1152,18 @@ class ChatRoomActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        StatusManager.getInstance().setOnline()
+        // Online status is handled globally by AgriStockApplication
+        // Refresh item info and visibility checks when resuming (e.g., after app refresh)
+        if (itemId != null && itemId!!.isNotEmpty()) {
+            loadItemInfo()
+            checkMarkSoldVisibility()
+            checkRateSellerVisibility()
+        }
     }
     
     override fun onPause() {
         super.onPause()
-        StatusManager.getInstance().setOffline()
+        // Offline status is handled globally by AgriStockApplication
     }
     
     override fun onStop() {
@@ -1022,6 +1182,13 @@ class ChatRoomActivity : AppCompatActivity() {
             statusListener = null
         } catch (e: Exception) {
             android.util.Log.e("ChatRoomActivity", "Error removing statusListener: ${e.message}")
+        }
+        
+        try {
+            postStatusListener?.remove()
+            postStatusListener = null
+        } catch (e: Exception) {
+            android.util.Log.e("ChatRoomActivity", "Error removing postStatusListener: ${e.message}")
         }
     }
     
@@ -1043,7 +1210,7 @@ class ChatRoomActivity : AppCompatActivity() {
             android.util.Log.e("ChatRoomActivity", "Error in onDestroy statusListener: ${e.message}")
         }
         
-        StatusManager.getInstance().setOffline()
+        // Offline status is handled globally by AgriStockApplication when app goes to background
     }
     
     private fun showOverflowMenu() {
@@ -1202,6 +1369,12 @@ class ChatRoomActivity : AppCompatActivity() {
             .add(blockData)
             .addOnSuccessListener {
                 android.util.Log.d("ChatRoomActivity", "User blocked successfully")
+                
+                // Archive the chat when user is blocked
+                if (chatId.isNotEmpty()) {
+                    com.example.agristockcapstoneproject.utils.BlockingUtils.archiveChat(chatId, currentUserId)
+                }
+                
                 Toast.makeText(this, "User blocked successfully", Toast.LENGTH_SHORT).show()
                 finish() // Close the chat room
             }
@@ -1289,38 +1462,67 @@ class ChatRoomActivity : AppCompatActivity() {
         builder.setPositiveButton("Delete") { _, _ ->
             val currentUserId = auth.currentUser?.uid ?: return@setPositiveButton
             
-            // Update message with new data model: isDeletedFor per-user flags
-            val isDeletedFor = mapOf(
-                currentUserId to true,
-                message.receiverId to false
-            )
-            
+            // Get the existing isDeletedFor map first, then merge the current user's deletion
             firestore.collection("messages").document(message.id)
-                .update("isDeletedFor", isDeletedFor)
-                .addOnSuccessListener {
-                    android.util.Log.d("ChatRoomActivity", "Message marked as deleted for user")
-                    Toast.makeText(this, "Message deleted", Toast.LENGTH_SHORT).show()
+                .get()
+                .addOnSuccessListener { doc ->
+                    val existingDeletedFor = doc.get("isDeletedFor") as? Map<String, Boolean> ?: emptyMap()
+                    val updatedDeletedFor = existingDeletedFor.toMutableMap()
+                    updatedDeletedFor[currentUserId] = true // Mark as deleted for current user
                     
-                    // Remove message from local list to update UI immediately
-                    try {
-                        if (position >= 0 && position < messages.size) {
-                    messages.removeAt(position)
-                    val adapter = recyclerView.adapter as? MessagesAdapter
-                            if (adapter != null) {
-                                adapter.notifyItemRemoved(position)
-                                if (position < messages.size) {
-                                    adapter.notifyItemRangeChanged(position, messages.size - position)
+                    // Update message with merged isDeletedFor map
+                    firestore.collection("messages").document(message.id)
+                        .update("isDeletedFor", updatedDeletedFor)
+                        .addOnSuccessListener {
+                            android.util.Log.d("ChatRoomActivity", "Message marked as deleted for user: ${message.id}")
+                            Toast.makeText(this, "Message deleted", Toast.LENGTH_SHORT).show()
+                            
+                            // Find and remove message by ID (more reliable than position)
+                            runOnUiThread {
+                                try {
+                                    val adapter = recyclerView.adapter as? MessagesAdapter
+                                    if (adapter != null) {
+                                        // Find message in adapter's list by ID
+                                        val adapterIndex = adapter.messageList.indexOfFirst { it.id == message.id }
+                                        if (adapterIndex >= 0) {
+                                            // Remove from adapter's list
+                                            adapter.messageList.removeAt(adapterIndex)
+                                            adapter.notifyItemRemoved(adapterIndex)
+                                            // Notify remaining items after removal
+                                            if (adapterIndex < adapter.messageList.size) {
+                                                adapter.notifyItemRangeChanged(adapterIndex, adapter.messageList.size - adapterIndex)
+                                            }
+                                            android.util.Log.d("ChatRoomActivity", "Message removed from adapter at position $adapterIndex")
+                                        } else {
+                                            android.util.Log.w("ChatRoomActivity", "Message not found in adapter list, refreshing")
+                                            // Fallback: refresh entire adapter
+                                            adapter.updateMessages(messages.toList())
+                                        }
+                                    }
+                                    
+                                    // Also remove from main messages list
+                                    val messageIndex = messages.indexOfFirst { it.id == message.id }
+                                    if (messageIndex >= 0) {
+                                        messages.removeAt(messageIndex)
+                                    }
+                                } catch (e: Exception) {
+                                    android.util.Log.e("ChatRoomActivity", "Error updating UI after deletion: ${e.message}", e)
+                                    // Refresh entire adapter as fallback
+                                    try {
+                                        (recyclerView.adapter as? MessagesAdapter)?.updateMessages(messages.toList())
+                                    } catch (e2: Exception) {
+                                        android.util.Log.e("ChatRoomActivity", "Error in fallback refresh: ${e2.message}")
+                                    }
                                 }
                             }
                         }
-                    } catch (e: Exception) {
-                        android.util.Log.e("ChatRoomActivity", "Error updating UI after deletion: ${e.message}")
-                        // Refresh entire adapter as fallback
-                        (recyclerView.adapter as? MessagesAdapter)?.updateMessages(messages)
-                    }
+                        .addOnFailureListener { e ->
+                            android.util.Log.e("ChatRoomActivity", "Error updating message deletion: ${e.message}")
+                            Toast.makeText(this, "Failed to delete message", Toast.LENGTH_SHORT).show()
+                        }
                 }
                 .addOnFailureListener { e ->
-                    android.util.Log.e("ChatRoomActivity", "Error marking message as deleted: ${e.message}")
+                    android.util.Log.e("ChatRoomActivity", "Error fetching message for deletion: ${e.message}")
                     Toast.makeText(this, "Failed to delete message", Toast.LENGTH_SHORT).show()
                 }
         }
@@ -1606,7 +1808,7 @@ class ChatRoomActivity : AppCompatActivity() {
     }
 
     inner class MessagesAdapter(
-        private val messageList: MutableList<Message>,
+        val messageList: MutableList<Message>, // Made non-private to allow access from deleteMessage
         private val currentUserId: String
     ) : RecyclerView.Adapter<MessagesAdapter.MessageViewHolder>() {
         
@@ -1827,44 +2029,69 @@ class ChatRoomActivity : AppCompatActivity() {
     }
     
     private fun loadUserData() {
-        if (otherUserId.isEmpty()) return
+        if (otherUserId.isEmpty()) {
+            android.util.Log.w("ChatRoomActivity", "Cannot load user data: otherUserId is empty")
+            return
+        }
+        
+        android.util.Log.d("ChatRoomActivity", "Loading user data for userId: $otherUserId")
         
         firestore.collection("users").document(otherUserId)
             .get()
             .addOnSuccessListener { document ->
-                if (document.exists()) {
-                    val data = document.data!!
-                    
-                    // Update username if not already set or if it's just "User"
-                    if (otherUserName.isEmpty() || otherUserName == "User") {
-                        val username = data["username"]?.toString() ?: 
-                            "${data["firstName"] ?: ""} ${data["lastName"] ?: ""}".trim()
-                                .ifEmpty { data["displayName"]?.toString() ?: "User" }
+                if (!isFinishing && !isDestroyed) {
+                    if (document.exists()) {
+                        val data = document.data ?: return@addOnSuccessListener
                         
+                        // Always get username from Firestore (more reliable than intent)
+                        val username = data["username"]?.toString()?.trim()?.ifEmpty { null } ?: 
+                            "${data["firstName"]?.toString() ?: ""} ${data["lastName"]?.toString() ?: ""}".trim().ifEmpty { null } ?:
+                            data["displayName"]?.toString()?.trim()?.ifEmpty { null } ?:
+                            "User"
+                        
+                        // Update username
                         otherUserName = username
-                        findViewById<TextView>(R.id.tv_username).text = username
-                    }
-                    
-                    // Update avatar if not already set
-                    if (otherUserAvatar.isNullOrEmpty()) {
-                        val avatarUrl = data["avatarUrl"]?.toString()
+                        val tvUsername = findViewById<TextView>(R.id.tv_username)
+                        if (tvUsername != null) {
+                            tvUsername.text = username
+                            android.util.Log.d("ChatRoomActivity", "Username updated to: $username")
+                        }
+                        
+                        // Always update avatar from Firestore
+                        val avatarUrl = data["avatarUrl"]?.toString()?.trim()?.ifEmpty { null }
                         if (!avatarUrl.isNullOrEmpty()) {
                             otherUserAvatar = avatarUrl
-                            Glide.with(this)
-                                .load(avatarUrl)
-                                .circleCrop()
-                                .placeholder(R.drawable.ic_profile)
-                                .error(R.drawable.ic_profile)
-                                .into(findViewById(R.id.iv_avatar))
+                            val ivAvatar = findViewById<ImageView>(R.id.iv_avatar)
+                            if (ivAvatar != null) {
+                                Glide.with(this)
+                                    .load(avatarUrl)
+                                    .circleCrop()
+                                    .placeholder(R.drawable.ic_profile)
+                                    .error(R.drawable.ic_profile)
+                                    .into(ivAvatar)
+                                android.util.Log.d("ChatRoomActivity", "Avatar updated from Firestore")
+                            }
+                        } else {
+                            android.util.Log.d("ChatRoomActivity", "No avatar URL found in Firestore")
+                        }
+                    } else {
+                        android.util.Log.w("ChatRoomActivity", "User document not found for userId: $otherUserId")
+                        val tvUsername = findViewById<TextView>(R.id.tv_username)
+                        if (tvUsername != null) {
+                            tvUsername.text = otherUserName.ifEmpty { "User" }
                         }
                     }
-                } else {
-                    findViewById<TextView>(R.id.tv_username).text = "User"
                 }
             }
             .addOnFailureListener { e ->
-                android.util.Log.e("ChatRoomActivity", "Error loading user data: ${e.message}")
-                findViewById<TextView>(R.id.tv_username).text = "User"
+                android.util.Log.e("ChatRoomActivity", "Error loading user data: ${e.message}", e)
+                if (!isFinishing && !isDestroyed) {
+                    val tvUsername = findViewById<TextView>(R.id.tv_username)
+                    if (tvUsername != null) {
+                        // Keep the username from intent if Firestore load fails
+                        tvUsername.text = otherUserName.ifEmpty { "User" }
+                    }
+                }
             }
     }
     
@@ -1931,35 +2158,7 @@ class ChatRoomActivity : AppCompatActivity() {
     }
     
     
-    private fun updateCurrentUserStatus(isOnline: Boolean) {
-        val currentUserId = auth.currentUser?.uid ?: return
-        
-        try {
-            val statusData = mapOf(
-                "isOnline" to isOnline,
-                "lastSeen" to System.currentTimeMillis()
-            )
-            
-            firestore.collection("users").document(currentUserId)
-                .update(statusData)
-                .addOnSuccessListener {
-                    android.util.Log.d("ChatRoomActivity", "User status updated: isOnline=$isOnline")
-                }
-                .addOnFailureListener { exception ->
-                    android.util.Log.e("ChatRoomActivity", "Failed to update user status: ${exception.message}")
-                    // Retry once after a short delay
-                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                        firestore.collection("users").document(currentUserId)
-                            .update(statusData)
-                            .addOnFailureListener { retryException ->
-                                android.util.Log.e("ChatRoomActivity", "Retry failed to update user status: ${retryException.message}")
-                            }
-                    }, 1000)
-                }
-        } catch (e: Exception) {
-            android.util.Log.e("ChatRoomActivity", "Error in updateCurrentUserStatus: ${e.message}")
-        }
-    }
+    // updateCurrentUserStatus function removed - online/offline status is now handled globally by AgriStockApplication
 
     private fun showMarkSoldDialog() {
         val currentUserId = auth.currentUser?.uid ?: return
@@ -2179,29 +2378,41 @@ class ChatRoomActivity : AppCompatActivity() {
                     val status = document.getString("status") ?: "FOR SALE"
                     val buyerId = document.getString("buyerId") ?: ""
                     val winnerId = document.getString("winnerId") ?: ""
+                    val postType = document.getString("type") ?: "SELL"
                     
                     android.util.Log.d("ChatRoomActivity", "Post data:")
                     android.util.Log.d("ChatRoomActivity", "  - sellerId: $sellerId")
                     android.util.Log.d("ChatRoomActivity", "  - status: $status")
                     android.util.Log.d("ChatRoomActivity", "  - buyerId: $buyerId")
                     android.util.Log.d("ChatRoomActivity", "  - winnerId: $winnerId")
-                    android.util.Log.d("ChatRoomActivity", "  - isBuyer: ${sellerId != currentUserId}")
+                    android.util.Log.d("ChatRoomActivity", "  - postType: $postType")
+                    android.util.Log.d("ChatRoomActivity", "  - currentUserId: $currentUserId")
+                    
+                    // Determine if current user is the buyer/winner
+                    val isBuyer = if (postType == "BID") {
+                        winnerId == currentUserId
+                    } else {
+                        buyerId == currentUserId
+                    }
+                    
+                    android.util.Log.d("ChatRoomActivity", "  - isBuyer: $isBuyer")
                     android.util.Log.d("ChatRoomActivity", "  - isSold: ${status == "SOLD"}")
                     
                     // Show Rate button only if:
-                    // 1. Current user is the buyer (not the seller)
+                    // 1. Current user is the buyer/winner (not the seller)
                     // 2. Item is SOLD
                     // 3. User hasn't rated yet
-                    if (sellerId != currentUserId && status == "SOLD") {
-                        android.util.Log.d("ChatRoomActivity", "User is buyer and item is SOLD, checking if already rated...")
+                    if (isBuyer && status == "SOLD" && sellerId != currentUserId) {
+                        android.util.Log.d("ChatRoomActivity", "✅ User is buyer/winner and item is SOLD, checking if already rated...")
                         checkIfUserHasRated(currentUserId, sellerId, postId)
                     } else {
                         val reason = when {
                             sellerId == currentUserId -> "User is the seller, not the buyer"
+                            !isBuyer -> "User is not the buyer/winner (buyerId: $buyerId, winnerId: $winnerId)"
                             status != "SOLD" -> "Item status is '$status', not 'SOLD'"
                             else -> "Unknown reason"
                         }
-                        android.util.Log.d("ChatRoomActivity", "Hiding Rate button - Reason: $reason")
+                        android.util.Log.d("ChatRoomActivity", "❌ Hiding Rate button - Reason: $reason")
                         runOnUiThread {
                             if (!isFinishing && !isDestroyed) {
                                 btnRateSeller.visibility = View.GONE
@@ -2222,6 +2433,81 @@ class ChatRoomActivity : AppCompatActivity() {
                 android.util.Log.e("ChatRoomActivity", "Error checking post status for rating: ${e.message}")
                 runOnUiThread {
                     if (!isFinishing && !isDestroyed) {
+                        btnRateSeller.visibility = View.GONE
+                    }
+                }
+            }
+    }
+    
+    /**
+     * Set up real-time listener for post status changes
+     * This ensures the UI updates immediately when the seller marks the item as sold
+     */
+    private fun setupPostStatusListener(postId: String) {
+        // Remove existing listener if any
+        postStatusListener?.remove()
+        
+        postStatusListener = firestore.collection("posts").document(postId)
+            .addSnapshotListener { snapshot, exception ->
+                if (exception != null) {
+                    android.util.Log.e("ChatRoomActivity", "Error in post status listener: ${exception.message}")
+                    return@addSnapshotListener
+                }
+                
+                if (snapshot != null && snapshot.exists()) {
+                    val status = snapshot.getString("status") ?: "FOR SALE"
+                    android.util.Log.d("ChatRoomActivity", "Post status changed to: $status")
+                    
+                    // Update UI based on new status
+                    runOnUiThread {
+                        if (!isFinishing && !isDestroyed) {
+                            updateUIForPostStatus(status)
+                            checkMarkSoldVisibility()
+                            checkRateSellerVisibility()
+                        }
+                    }
+                }
+            }
+    }
+    
+    /**
+     * Update UI elements based on post status
+     */
+    private fun updateUIForPostStatus(status: String) {
+        val currentUserId = auth.currentUser?.uid ?: return
+        
+        // Check if current user is the seller
+        firestore.collection("posts").document(itemId ?: return)
+            .get()
+            .addOnSuccessListener { document ->
+                if (document.exists()) {
+                    val sellerId = document.getString("userId") ?: ""
+                    val isSeller = sellerId == currentUserId
+                    
+                    if (status == "SOLD") {
+                        if (isSeller) {
+                            // Seller sees SOLD chip, no Mark as Sold button
+                            btnMarkSold.visibility = View.GONE
+                            chipSold.visibility = View.VISIBLE
+                            btnRateSeller.visibility = View.GONE
+                        } else {
+                            // Buyer - check if they can rate (will be handled by checkRateSellerVisibility)
+                            btnMarkSold.visibility = View.GONE
+                            chipSold.visibility = View.GONE
+                            // Trigger rate seller visibility check
+                            checkRateSellerVisibility()
+                        }
+                    } else {
+                        if (isSeller) {
+                            // Item not sold, seller can mark as sold
+                            btnMarkSold.visibility = View.VISIBLE
+                            chipSold.visibility = View.GONE
+                        } else {
+                            // Buyer doesn't see mark as sold button
+                            btnMarkSold.visibility = View.GONE
+                            chipSold.visibility = View.GONE
+                        }
+                        // Hide rate button if item is not sold
                         btnRateSeller.visibility = View.GONE
                     }
                 }

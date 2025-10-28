@@ -14,6 +14,8 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import android.content.SharedPreferences
+import android.util.Log
+import com.example.agristockcapstoneproject.utils.UserFieldsMigration
 
 class SettingsActivity : AppCompatActivity() {
 
@@ -79,6 +81,43 @@ class SettingsActivity : AppCompatActivity() {
         // Support: Contact Support
         findViewById<View>(R.id.row_support_contact_support).setOnClickListener {
             startActivity(Intent(this, ContactSupportActivity::class.java))
+        }
+
+        // Hidden: Long press on root layout to run migration (for adding missing fields to users)
+        findViewById<View>(android.R.id.content).setOnLongClickListener {
+            // Long press anywhere on the screen to trigger migration dialog
+            // This is for admin use only
+            showMigrationDialog()
+            true
+        }
+    }
+
+    private fun showMigrationDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("Add Missing Fields to All Users?")
+            .setMessage("This will add 'verificationStatus' and 'biddingApprovalStatus' fields to all users who don't have them.\n\nThis is safe to run multiple times.")
+            .setPositiveButton("Run Migration") { _, _ ->
+                runMigration()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun runMigration() {
+        val migration = UserFieldsMigration()
+        Toast.makeText(this, "Starting migration...", Toast.LENGTH_SHORT).show()
+        Log.d("SettingsActivity", "Starting user fields migration...")
+        
+        migration.migrateAllUsers { success, message ->
+            runOnUiThread {
+                AlertDialog.Builder(this)
+                    .setTitle(if (success) "Migration Complete" else "Migration Completed with Errors")
+                    .setMessage(message)
+                    .setPositiveButton("OK", null)
+                    .show()
+                
+                Log.d("SettingsActivity", "Migration result: $message")
+            }
         }
     }
 

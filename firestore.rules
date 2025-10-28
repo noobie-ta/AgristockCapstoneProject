@@ -2,10 +2,18 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
+    // --- HELPER FUNCTIONS ---
+    // Check if user is verified (approved by admin)
+    function isUserVerified(userId) {
+      return get(/databases/$(database)/documents/users/$(userId)).data.verificationStatus == 'approved';
+    }
+    
     // --- POSTS ---
     match /posts/{postId} {
       allow read: if true;
-      allow create: if request.auth != null;
+      // ✅ VERIFICATION REQUIRED: Users must be verified to create posts
+      allow create: if request.auth != null && 
+        isUserVerified(request.auth.uid);
       allow update, delete: if request.auth != null &&
         resource.data.userId == request.auth.uid;
       // Allow any authenticated user to update favoriteCount and bidding fields
@@ -71,10 +79,11 @@ service cloud.firestore {
       // Allow participants to delete chats
       allow delete: if request.auth != null &&
         request.auth.uid in resource.data.participants;
-      // Allow creation if user is in participants
+      // ✅ VERIFICATION REQUIRED: Users must be verified to create chats
       allow create: if request.auth != null &&
         request.resource.data.participants.size() == 2 &&
-        request.auth.uid in request.resource.data.participants;
+        request.auth.uid in request.resource.data.participants &&
+        isUserVerified(request.auth.uid);
       // Allow list operations for queries (including whereArrayContains)
       allow list: if request.auth != null;
       // Allow admin to read, update, and delete any chat
@@ -88,9 +97,10 @@ service cloud.firestore {
       allow read: if request.auth != null && 
         (resource.data.senderId == request.auth.uid || 
          resource.data.receiverId == request.auth.uid);
-      // Allow users to create messages
+      // ✅ VERIFICATION REQUIRED: Users must be verified to send messages
       allow create: if request.auth != null &&
-        request.resource.data.senderId == request.auth.uid;
+        request.resource.data.senderId == request.auth.uid &&
+        isUserVerified(request.auth.uid);
       // Allow users to update messages they sent (for read status)
       allow update: if request.auth != null &&
         (resource.data.senderId == request.auth.uid || 

@@ -45,8 +45,10 @@ class MessagesActivity : AppCompatActivity() {
     private val auth: FirebaseAuth by lazy { FirebaseAuth.getInstance() }
     private val firestore: FirebaseFirestore by lazy { FirebaseFirestore.getInstance() }
     private var chatsListener: ListenerRegistration? = null
+    private var blockedUsersListener: ListenerRegistration? = null
     private val chats = mutableListOf<ChatItem>()
     private val onlineStatusListeners = mutableMapOf<String, ListenerRegistration>()
+    private val blockedUserIds = mutableSetOf<String>() // Cache of blocked user IDs
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -57,20 +59,56 @@ class MessagesActivity : AppCompatActivity() {
 
         initializeViews()
         setupClickListeners()
+        loadBlockedUsers()
         loadChats()
     }
     
-    override fun onResume() {
-        super.onResume()
-        // Set current user as online
-        StatusManager.getInstance().setOnline()
+    private fun loadBlockedUsers() {
+        val currentUserId = auth.currentUser?.uid ?: return
+        
+        // Load users that current user has blocked AND users who have blocked current user (bidirectional)
+        blockedUsersListener = firestore.collection("blocks")
+            .whereEqualTo("blockerId", currentUserId)
+            .addSnapshotListener { snapshot1, exception1 ->
+                if (exception1 != null) {
+                    android.util.Log.e("MessagesActivity", "Error loading blocked users: ${exception1.message}")
+                    return@addSnapshotListener
+                }
+                
+                blockedUserIds.clear()
+                snapshot1?.documents?.forEach { doc ->
+                    val blockedUserId = doc.getString("blockedUserId")
+                    if (!blockedUserId.isNullOrEmpty()) {
+                        blockedUserIds.add(blockedUserId)
+                    }
+                }
+                
+                // Also check users who have blocked the current user
+                firestore.collection("blocks")
+                    .whereEqualTo("blockedUserId", currentUserId)
+                    .get()
+                    .addOnSuccessListener { snapshot2 ->
+                        snapshot2?.documents?.forEach { doc ->
+                            val blockerId = doc.getString("blockerId")
+                            if (!blockerId.isNullOrEmpty()) {
+                                blockedUserIds.add(blockerId)
+                            }
+                        }
+                        
+                        android.util.Log.d("MessagesActivity", "Loaded ${blockedUserIds.size} blocked users (bidirectional)")
+                        // Refresh chats when blocked users list updates
+                        loadChats()
+                    }
+                    .addOnFailureListener { exception2 ->
+                        android.util.Log.e("MessagesActivity", "Error loading users who blocked current user: ${exception2.message}")
+                        android.util.Log.d("MessagesActivity", "Loaded ${blockedUserIds.size} blocked users (one-way)")
+                        loadChats()
+                    }
+            }
     }
     
-    override fun onPause() {
-        super.onPause()
-        // Set current user as offline
-        StatusManager.getInstance().setOffline()
-    }
+    // Removed onResume() and onPause() status updates
+    // Online/offline status is now managed globally by AgriStockApplication
 
     private fun initializeViews() {
         recyclerView = findViewById(R.id.rv_chats)
@@ -216,6 +254,12 @@ class MessagesActivity : AppCompatActivity() {
                                 val otherUserId = participants.find { it != currentUserId }
                                 if (otherUserId == null) {
                                     android.util.Log.w("MessagesActivity", "No other user found in chat ${doc.id}")
+                                    return@forEach
+                                }
+                                
+                                // Filter out chats with blocked users (bidirectional check)
+                                if (blockedUserIds.contains(otherUserId)) {
+                                    android.util.Log.d("MessagesActivity", "Chat ${doc.id} is with blocked user $otherUserId - skipping")
                                     return@forEach
                                 }
                                 
@@ -415,6 +459,7 @@ class MessagesActivity : AppCompatActivity() {
 
     private fun showEmptyState() {
         emptyState.visibility = View.VISIBLE
+        swipeRefresh.isRefreshing = false
     }
     
     private fun tryFallbackQuery() {
@@ -490,6 +535,7 @@ class MessagesActivity : AppCompatActivity() {
                                             showEmptyState()
                                         } else {
                                             emptyState.visibility = View.GONE
+                                            swipeRefresh.isRefreshing = false
                                         }
                                     }
                                 }
@@ -535,6 +581,13 @@ class MessagesActivity : AppCompatActivity() {
             chatsListener = null
         } catch (e: Exception) {
             android.util.Log.e("MessagesActivity", "Error in onDestroy chatsListener: ${e.message}")
+        }
+        
+        try {
+            blockedUsersListener?.remove()
+            blockedUsersListener = null
+        } catch (e: Exception) {
+            android.util.Log.e("MessagesActivity", "Error in onDestroy blockedUsersListener: ${e.message}")
         }
         
         try {

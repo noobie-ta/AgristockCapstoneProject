@@ -123,6 +123,9 @@ class BidPostActivity : AppCompatActivity() {
         setupUI()
         setupClickListeners()
         
+        // ✅ CHECK VERIFICATION: Users must be verified to create bid posts
+        checkUserVerification()
+        
         // Debug: Check button state
         android.util.Log.d("BidPostActivity", "Button enabled: ${binding.btnPostItem.isEnabled}")
         android.util.Log.d("BidPostActivity", "Button clickable: ${binding.btnPostItem.isClickable}")
@@ -716,4 +719,145 @@ class BidPostActivity : AppCompatActivity() {
             Toast.makeText(this, "Camera permission is required to take photos", Toast.LENGTH_SHORT).show()
         }
     }
+    
+    // ✅ VERIFICATION AND BIDDING APPROVAL CHECK FUNCTIONS
+    private fun checkUserVerification() {
+        val currentUser = auth.currentUser
+        if (currentUser == null) {
+            Toast.makeText(this, "Please log in to create bid posts", Toast.LENGTH_SHORT).show()
+            finish()
+            return
+        }
+        
+        firestore.collection("users").document(currentUser.uid)
+            .get(com.google.firebase.firestore.Source.SERVER)
+            .addOnSuccessListener { document ->
+                val verificationStatus = document.getString("verificationStatus")?.trim()?.lowercase()
+                val biddingApprovalStatus = document.getString("biddingApprovalStatus")?.trim()?.lowercase()
+                
+                // First check verification status
+                when (verificationStatus) {
+                    "approved" -> {
+                        // User is verified, now check bidding approval
+                        when (biddingApprovalStatus) {
+                            "approved" -> {
+                                // Both verified and bidding approved - can create bid post
+                                android.util.Log.d("BidPostActivity", "✅ User is verified and bidding approved, can create bid post")
+                            }
+                            "pending" -> {
+                                android.util.Log.d("BidPostActivity", "⏳ User bidding approval is pending")
+                                showBiddingPendingDialog()
+                            }
+                            "rejected" -> {
+                                android.util.Log.d("BidPostActivity", "❌ User bidding approval was rejected")
+                                showBiddingRejectedDialog()
+                            }
+                            else -> {
+                                // Bidding not applied or not approved
+                                android.util.Log.d("BidPostActivity", "⚠️ User bidding approval is not approved")
+                                showBiddingRequiredDialog()
+                            }
+                        }
+                    }
+                    "pending" -> {
+                        android.util.Log.d("BidPostActivity", "⏳ User verification is pending")
+                        showVerificationPendingDialog()
+                    }
+                    "rejected" -> {
+                        android.util.Log.d("BidPostActivity", "❌ User verification was rejected")
+                        showVerificationRejectedDialog()
+                    }
+                    else -> {
+                        // Not verified yet
+                        android.util.Log.d("BidPostActivity", "⚠️ User is not verified")
+                        showVerificationRequiredDialog()
+                    }
+                }
+            }
+            .addOnFailureListener { exception ->
+                android.util.Log.e("BidPostActivity", "Error checking verification: ${exception.message}")
+                Toast.makeText(this, "Error checking verification: ${exception.message}", Toast.LENGTH_SHORT).show()
+                finish()
+            }
+    }
+    
+    private fun showVerificationRequiredDialog() {
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("Verification Required")
+            .setMessage("You must verify your account before creating bid posts. This helps maintain trust and safety in our community.\n\nWould you like to verify your account now?")
+            .setPositiveButton("Verify Now") { _, _ ->
+                startActivity(Intent(this, VerificationActivity::class.java))
+                finish()
+            }
+            .setNegativeButton("Cancel") { _, _ ->
+                finish()
+            }
+            .setCancelable(false)
+            .show()
+    }
+    
+    private fun showVerificationPendingDialog() {
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("Verification Pending")
+            .setMessage("Your verification request is being reviewed by our team. You'll be able to create bid posts once your account is verified.\n\nThank you for your patience!")
+            .setPositiveButton("OK") { _, _ ->
+                finish()
+            }
+            .setCancelable(false)
+            .show()
+    }
+    
+    private fun showVerificationRejectedDialog() {
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("Verification Required")
+            .setMessage("Your previous verification was rejected. Please submit a new verification request with valid documents.\n\nWould you like to resubmit your verification?")
+            .setPositiveButton("Resubmit") { _, _ ->
+                startActivity(Intent(this, VerificationActivity::class.java))
+                finish()
+            }
+            .setNegativeButton("Cancel") { _, _ ->
+                finish()
+            }
+            .setCancelable(false)
+            .show()
+    }
+    
+    private fun showBiddingRequiredDialog() {
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("Bidding Approval Required")
+            .setMessage("You must be approved for bidding before creating bid posts. Even though your account is verified, you need separate approval to participate in bidding.\n\nWould you like to apply for bidding approval?")
+            .setPositiveButton("Apply Now") { _, _ ->
+                // Navigate to bidding approval page (if exists) or show message
+                Toast.makeText(this, "Bidding application feature coming soon!", Toast.LENGTH_SHORT).show()
+                finish()
+            }
+            .setNegativeButton("Cancel") { _, _ ->
+                finish()
+            }
+            .setCancelable(false)
+            .show()
+    }
+    
+    private fun showBiddingPendingDialog() {
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("Bidding Approval Pending")
+            .setMessage("Your bidding approval request is being reviewed. You'll be able to create bid posts once your bidding approval is granted.\n\nThank you for your patience!")
+            .setPositiveButton("OK") { _, _ ->
+                finish()
+            }
+            .setCancelable(false)
+            .show()
+    }
+    
+    private fun showBiddingRejectedDialog() {
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("Bidding Approval Required")
+            .setMessage("Your bidding approval was rejected. Even though your account is verified, you need bidding approval to create bid posts.\n\nPlease contact support for more information.")
+            .setPositiveButton("OK") { _, _ ->
+                finish()
+            }
+            .setCancelable(false)
+            .show()
+    }
 }
+

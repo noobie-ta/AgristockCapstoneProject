@@ -47,10 +47,12 @@ class LoginActivity : AppCompatActivity() {
             }
         }
 
-        
-
         binding.tvSignUp.setOnClickListener {
             startActivity(Intent(this, com.example.agristockcapstoneproject.login.SignUpActivity::class.java))
+        }
+        
+        binding.tvForgotPassword.setOnClickListener {
+            showForgotPasswordDialog()
         }
     }
 
@@ -121,8 +123,14 @@ class LoginActivity : AppCompatActivity() {
                     "phone" to (currentUser.phoneNumber ?: ""),
                     "createdAt" to com.google.firebase.Timestamp.now(),
                     "isEmailVerified" to currentUser.isEmailVerified,
+                    // ✅ Initialize verification and bidding status
+                    "verificationStatus" to "not_verified", // Options: "not_verified", "pending", "approved", "rejected"
+                    "biddingApprovalStatus" to "not_applied", // Options: "not_applied", "pending", "approved", "rejected", "banned"
                     "rating" to 0.0,
-                    "totalRatings" to 0L
+                    "totalRatings" to 0L,
+                    // ✅ Initialize online status
+                    "isOnline" to false,
+                    "lastSeen" to System.currentTimeMillis()
                 )
                 userDocRef.set(userData)
                     .addOnSuccessListener { navigateToMain() }
@@ -137,40 +145,118 @@ class LoginActivity : AppCompatActivity() {
     }
 
     private fun showForgotPasswordDialog() {
-        val builder = androidx.appcompat.app.AlertDialog.Builder(this)
-        val input = android.widget.EditText(this)
-        input.inputType = android.text.InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
-        input.hint = "Enter your email"
-        input.setPadding(50, 30, 50, 30)
+        val dialogView = layoutInflater.inflate(R.layout.dialog_forgot_password, null)
+        val emailInput = dialogView.findViewById<android.widget.EditText>(R.id.et_email)
+        val btnSend = dialogView.findViewById<androidx.appcompat.widget.AppCompatButton>(R.id.btn_send)
+        val btnCancel = dialogView.findViewById<androidx.appcompat.widget.AppCompatButton>(R.id.btn_cancel)
 
-        builder.setTitle("Reset Password")
-        builder.setMessage("Enter your email to receive password reset instructions")
-        builder.setView(input)
+        val dialog = androidx.appcompat.app.AlertDialog.Builder(this)
+            .setView(dialogView)
+            .setCancelable(true)
+            .create()
 
-        builder.setPositiveButton("Send") { _, _ ->
-            val email = input.text.toString().trim()
-            if (email.isNotEmpty() && android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
-                sendPasswordResetEmail(email)
-            } else {
-                Toast.makeText(this, "Please enter a valid email", Toast.LENGTH_SHORT).show()
+        // Style the dialog window
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+        dialog.window?.setDimAmount(0.5f)
+
+        btnSend.setOnClickListener {
+            val email = emailInput.text.toString().trim()
+            if (email.isEmpty()) {
+                emailInput.error = "Email is required"
+                emailInput.requestFocus()
+                return@setOnClickListener
             }
+            if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+                emailInput.error = "Please enter a valid email address"
+                emailInput.requestFocus()
+                return@setOnClickListener
+            }
+            dialog.dismiss()
+            sendPasswordResetEmail(email)
         }
 
-        builder.setNegativeButton("Cancel") { dialog, _ ->
-            dialog.cancel()
+        btnCancel.setOnClickListener {
+            dialog.dismiss()
         }
 
-        builder.show()
+        dialog.show()
+
+        // Make dialog responsive to all screen sizes
+        val displayMetrics = resources.displayMetrics
+        val screenWidth = displayMetrics.widthPixels
+        val screenHeight = displayMetrics.heightPixels
+        val density = displayMetrics.density
+        
+        // Calculate responsive width:
+        // - Use 90% of screen width
+        // - Minimum 280dp (for very small phones like 320dp width)
+        // - Maximum 400dp (for tablets and larger phones)
+        // - Account for padding (32dp = 16dp * 2)
+        val minWidthDp = 280
+        val maxWidthDp = 400
+        val paddingDp = 32
+        
+        val minWidthPx = (minWidthDp * density).toInt()
+        val maxWidthPx = (maxWidthDp * density).toInt()
+        val paddingPx = (paddingDp * density).toInt()
+        
+        // Use 90% of screen width, but respect min/max bounds
+        val calculatedWidth = (screenWidth * 0.9).toInt()
+        val dialogWidth = calculatedWidth.coerceIn(minWidthPx, maxWidthPx)
+        
+        // Set maximum height to 85% of screen height to prevent overflow
+        val maxHeightPx = (screenHeight * 0.85).toInt()
+        
+        // Set dialog dimensions - width is responsive, height wraps content but respects max
+        val dialogHeight = android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+        dialog.window?.setLayout(dialogWidth, dialogHeight)
     }
 
     private fun sendPasswordResetEmail(email: String) {
-        auth.sendPasswordResetEmail(email)
-            .addOnCompleteListener { task ->
-                if (task.isSuccessful) {
-                    Toast.makeText(this, "Password reset email sent to $email", Toast.LENGTH_LONG).show()
+        // Check if email exists in Firestore first
+        firestore.collection("users")
+            .whereEqualTo("email", email.lowercase().trim())
+            .get()
+            .addOnSuccessListener { querySnapshot ->
+                if (querySnapshot.isEmpty) {
+                    // Email doesn't exist in system
+                    Toast.makeText(this, "No account found with this email address", Toast.LENGTH_LONG).show()
                 } else {
-                    Toast.makeText(this, "Error: ${task.exception?.message}", Toast.LENGTH_LONG).show()
+                    // Email exists, send password reset email
+                    auth.sendPasswordResetEmail(email)
+                        .addOnCompleteListener { task ->
+                            if (task.isSuccessful) {
+                                Toast.makeText(this, "Password reset email sent to $email\nPlease check your inbox and spam folder", Toast.LENGTH_LONG).show()
+                                Log.d("LoginActivity", "Password reset email sent successfully to $email")
+                            } else {
+                                val errorMessage = when {
+                                    task.exception?.message?.contains("user-not-found", ignoreCase = true) == true -> {
+                                        "No account found with this email address"
+                                    }
+                                    task.exception?.message?.contains("invalid-email", ignoreCase = true) == true -> {
+                                        "Invalid email address format"
+                                    }
+                                    else -> {
+                                        task.exception?.message ?: "Failed to send reset email. Please try again."
+                                    }
+                                }
+                                Toast.makeText(this, "Error: $errorMessage", Toast.LENGTH_LONG).show()
+                                Log.e("LoginActivity", "Failed to send password reset email: ${task.exception?.message}")
+                            }
+                        }
                 }
+            }
+            .addOnFailureListener { e ->
+                Log.e("LoginActivity", "Error checking email existence: ${e.message}")
+                // On error, still try to send reset email (Firebase will handle validation)
+                auth.sendPasswordResetEmail(email)
+                    .addOnCompleteListener { task ->
+                        if (task.isSuccessful) {
+                            Toast.makeText(this, "Password reset email sent to $email\nPlease check your inbox and spam folder", Toast.LENGTH_LONG).show()
+                        } else {
+                            Toast.makeText(this, "Error: ${task.exception?.message}", Toast.LENGTH_LONG).show()
+                        }
+                    }
             }
     }
 
@@ -179,5 +265,4 @@ class LoginActivity : AppCompatActivity() {
         finish()
     }
 }
-
 

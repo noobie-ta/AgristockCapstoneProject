@@ -124,6 +124,76 @@
 
                         </LinearLayout>
 
+                        <!-- Verified and Bidding Badges -->
+                        <LinearLayout
+                            android:id="@+id/ll_badges"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:layout_marginTop="8dp">
+
+                            <!-- Verified Badge Chip -->
+                            <LinearLayout
+                                android:id="@+id/chip_verified"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:orientation="horizontal"
+                                android:background="@drawable/badge_verified_background"
+                                android:paddingHorizontal="10dp"
+                                android:paddingVertical="6dp"
+                                android:gravity="center_vertical"
+                                android:layout_marginEnd="8dp"
+                                android:visibility="gone">
+
+                                <ImageView
+                                    android:layout_width="16dp"
+                                    android:layout_height="16dp"
+                                    android:src="@drawable/ic_verified_badge"
+                                    android:layout_marginEnd="4dp" />
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="Verified"
+                                    android:textColor="#1976D2"
+                                    android:textSize="12sp"
+                                    android:textStyle="bold" />
+
+                            </LinearLayout>
+
+                            <!-- Bidding Approved Badge Chip -->
+                            <LinearLayout
+                                android:id="@+id/chip_bidder"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:orientation="horizontal"
+                                android:background="@drawable/badge_bidder_background"
+                                android:paddingHorizontal="10dp"
+                                android:paddingVertical="6dp"
+                                android:gravity="center_vertical"
+                                android:visibility="gone">
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="✓"
+                                    android:textColor="#388E3C"
+                                    android:textSize="14sp"
+                                    android:textStyle="bold"
+                                    android:layout_marginEnd="4dp" />
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="Bidder Approved"
+                                    android:textColor="#388E3C"
+                                    android:textSize="12sp"
+                                    android:textStyle="bold" />
+
+                            </LinearLayout>
+
+                        </LinearLayout>
+
                         <!-- Rating Section -->
                         <LinearLayout
                             android:layout_width="wrap_content"
@@ -284,6 +354,38 @@
                     android:textSize="18sp"
                     android:textStyle="bold"
                     android:fontFamily="sans-serif-medium" />
+
+                <!-- Filter Button -->
+                <LinearLayout
+                    android:id="@+id/btn_filter"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:background="@drawable/filter_button_background"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="12dp"
+                    android:paddingVertical="8dp"
+                    android:layout_marginEnd="8dp">
+
+                    <ImageView
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:src="@drawable/ic_filter"
+                        android:tint="#000000" />
+
+                    <TextView
+                        android:id="@+id/tv_filter_text"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="6dp"
+                        android:text="Filter"
+                        android:textColor="#000000"
+                        android:textSize="14sp"
+                        android:fontFamily="sans-serif-medium" />
+
+                </LinearLayout>
 
                 <!-- View Toggle Buttons -->
                 <LinearLayout

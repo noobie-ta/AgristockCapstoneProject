@@ -466,16 +466,11 @@ class ViewBiddingActivity : AppCompatActivity() {
                     
                     android.util.Log.d("ViewBiddingActivity", "User data - username: $username, avatarUrl: $avatarUrl, rating: $rating, totalRatings: $totalRatings")
                     
-                    // Check verification status
-                    val verificationStatus = document.getString("verificationStatus")
-                    val isVerified = verificationStatus == "approved"
-                    val verifiedTag = if (isVerified) " ✅ Verified Seller" else ""
-                    
                     // Display username with rating (show rating if there are actual ratings)
                     val displayText = if (totalRatings > 0 && rating > 0) {
-                        "Seller: $username$verifiedTag (${String.format("%.1f", rating)}★)"
+                        "Seller: $username (${String.format("%.1f", rating)}★)"
                     } else {
-                        "Seller: $username$verifiedTag (No ratings yet ⭐)"
+                        "Seller: $username (No ratings yet ⭐)"
                     }
                     sellerNameText.text = displayText
                     updateStarRatingDisplay(rating.toFloat(), totalRatings.toInt())

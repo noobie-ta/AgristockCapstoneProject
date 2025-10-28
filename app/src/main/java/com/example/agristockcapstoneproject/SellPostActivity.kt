@@ -106,6 +106,9 @@ class SellPostActivity : AppCompatActivity() {
         initializeViews()
         setupClickListeners()
         setupCategorySpinner()
+        
+        // ✅ CHECK VERIFICATION: Users must be verified to create posts
+        checkUserVerification()
     }
 
     private fun initializeViews() {
@@ -564,4 +567,91 @@ class SellPostActivity : AppCompatActivity() {
             pickImagesLauncher.launch("image/*")
         }
     }
+    
+    // ✅ VERIFICATION CHECK FUNCTIONS
+    private fun checkUserVerification() {
+        val currentUser = auth.currentUser
+        if (currentUser == null) {
+            Toast.makeText(this, "Please log in to create posts", Toast.LENGTH_SHORT).show()
+            finish()
+            return
+        }
+        
+        firestore.collection("users").document(currentUser.uid)
+            .get(com.google.firebase.firestore.Source.SERVER)
+            .addOnSuccessListener { document ->
+                val verificationStatus = document.getString("verificationStatus")?.trim()?.lowercase()
+                
+                // Debug logging
+                android.util.Log.d("SellPostActivity", "Checking verificationStatus: '$verificationStatus'")
+                android.util.Log.d("SellPostActivity", "Raw document data: ${document.data}")
+                
+                when (verificationStatus) {
+                    "approved" -> {
+                        // User is verified, proceed
+                        android.util.Log.d("SellPostActivity", "✅ User is verified, can create post")
+                    }
+                    "pending" -> {
+                        android.util.Log.d("SellPostActivity", "⏳ User verification is pending")
+                        showVerificationPendingDialog()
+                    }
+                    "rejected" -> {
+                        android.util.Log.d("SellPostActivity", "❌ User verification was rejected")
+                        showVerificationRejectedDialog()
+                    }
+                    else -> {
+                        // Not verified yet
+                        android.util.Log.d("SellPostActivity", "⚠️ User is not verified")
+                        showVerificationRequiredDialog()
+                    }
+                }
+            }
+            .addOnFailureListener { exception ->
+                android.util.Log.e("SellPostActivity", "Error checking verification: ${exception.message}")
+                Toast.makeText(this, "Error checking verification: ${exception.message}", Toast.LENGTH_SHORT).show()
+                finish()
+            }
+    }
+    
+    private fun showVerificationRequiredDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("Verification Required")
+            .setMessage("You must verify your account before creating posts. This helps maintain trust and safety in our community.\n\nWould you like to verify your account now?")
+            .setPositiveButton("Verify Now") { _, _ ->
+                startActivity(Intent(this, VerificationActivity::class.java))
+                finish()
+            }
+            .setNegativeButton("Cancel") { _, _ ->
+                finish()
+            }
+            .setCancelable(false)
+            .show()
+    }
+    
+    private fun showVerificationPendingDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("Verification Pending")
+            .setMessage("Your verification request is being reviewed by our team. You'll be able to create posts once your account is verified.\n\nThank you for your patience!")
+            .setPositiveButton("OK") { _, _ ->
+                finish()
+            }
+            .setCancelable(false)
+            .show()
+    }
+    
+    private fun showVerificationRejectedDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("Verification Required")
+            .setMessage("Your previous verification was rejected. Please submit a new verification request with valid documents.\n\nWould you like to resubmit your verification?")
+            .setPositiveButton("Resubmit") { _, _ ->
+                startActivity(Intent(this, VerificationActivity::class.java))
+                finish()
+            }
+            .setNegativeButton("Cancel") { _, _ ->
+                finish()
+            }
+            .setCancelable(false)
+            .show()
+    }
 }
+

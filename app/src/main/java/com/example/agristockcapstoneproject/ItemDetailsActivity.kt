@@ -11,6 +11,8 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import com.bumptech.glide.Glide
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -87,7 +89,24 @@ class ItemDetailsActivity : AppCompatActivity() {
 			return
 		}
 
+		setupWindowInsets()
 		loadPost(postId)
+	}
+	
+	private fun setupWindowInsets() {
+		val bottomActionBar = findViewById<View>(R.id.ll_bottom_action_bar)
+		if (bottomActionBar != null) {
+			ViewCompat.setOnApplyWindowInsetsListener(bottomActionBar) { view, insets ->
+				val navigationBarHeight = insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
+				view.setPadding(
+					view.paddingLeft,
+					view.paddingTop,
+					view.paddingRight,
+					view.paddingBottom + navigationBarHeight.coerceAtLeast(0)
+				)
+				insets
+			}
+		}
 	}
 
 	override fun onResume() {
@@ -233,16 +252,11 @@ class ItemDetailsActivity : AppCompatActivity() {
 					
 					android.util.Log.d("ItemDetailsActivity", "User data - username: $username, avatarUrl: $avatarUrl, rating: $rating, totalRatings: $totalRatings")
 					
-					// Check verification status
-					val verificationStatus = snap.getString("verificationStatus")
-					val isVerified = verificationStatus == "approved"
-					val verifiedTag = if (isVerified) " ✅ Verified Seller" else ""
-					
 					// Display username with rating (show rating if there are actual ratings)
 					val displayText = if (totalRatings > 0 && rating > 0) {
-						"$username$verifiedTag (${String.format("%.1f", rating)}★)"
+						"$username (${String.format("%.1f", rating)}★)"
 					} else {
-						"$username$verifiedTag (No ratings yet ⭐)"
+						"$username (No ratings yet ⭐)"
 					}
 					tvSellerName.text = displayText
 					
@@ -523,33 +537,68 @@ class ItemDetailsActivity : AppCompatActivity() {
             return
         }
         
-        // Get post details to find the seller
-        firestore.collection("posts").document(postId)
-            .get()
-            .addOnSuccessListener { postDoc ->
-                if (postDoc.exists()) {
-                    val sellerId = postDoc.getString("userId")
-                    if (sellerId.isNullOrEmpty()) {
-                        Toast.makeText(this, "Seller information not available", Toast.LENGTH_SHORT).show()
-                        return@addOnSuccessListener
-                    }
-                    
-                    // Check if user is trying to contact themselves
-                    if (sellerId == currentUserId) {
-                        btnContactSeller.isEnabled = false
-                        btnContactSeller.alpha = 0.5f
-                        Toast.makeText(this, "You can't message yourself", Toast.LENGTH_SHORT).show()
-                        return@addOnSuccessListener
-                    }
-                    
-                    // Create or find chat with seller
-                    createOrFindChat(sellerId)
-                } else {
-                    Toast.makeText(this, "Post not found", Toast.LENGTH_SHORT).show()
+        // ✅ CHECK VERIFICATION: Users must be verified to message sellers
+        firestore.collection("users").document(currentUserId)
+            .get(com.google.firebase.firestore.Source.SERVER)
+            .addOnSuccessListener { userDoc ->
+                val verificationStatus = userDoc.getString("verificationStatus")?.trim()?.lowercase()
+                
+                // Debug logging
+                android.util.Log.d("ItemDetailsActivity", "Checking verificationStatus: '$verificationStatus'")
+                android.util.Log.d("ItemDetailsActivity", "Raw document data: ${userDoc.data}")
+                
+                if (verificationStatus != "approved") {
+                    android.util.Log.d("ItemDetailsActivity", "⚠️ User is not verified, cannot contact seller")
+                    showVerificationRequiredForMessaging(verificationStatus)
+                    return@addOnSuccessListener
                 }
+                
+                android.util.Log.d("ItemDetailsActivity", "✅ User is verified, proceeding with contact seller")
+                
+                // User is verified, proceed with getting post details
+                firestore.collection("posts").document(postId)
+                    .get()
+                    .addOnSuccessListener { postDoc ->
+                        if (postDoc.exists()) {
+                            val sellerId = postDoc.getString("userId")
+                            if (sellerId.isNullOrEmpty()) {
+                                Toast.makeText(this, "Seller information not available", Toast.LENGTH_SHORT).show()
+                                return@addOnSuccessListener
+                            }
+                            
+                            // Check if user is trying to contact themselves
+                            if (sellerId == currentUserId) {
+                                btnContactSeller.isEnabled = false
+                                btnContactSeller.alpha = 0.5f
+                                Toast.makeText(this, "You can't message yourself", Toast.LENGTH_SHORT).show()
+                                return@addOnSuccessListener
+                            }
+                            
+                            // Check if either user has blocked the other (bidirectional)
+                            val currentUserId = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
+                            if (currentUserId != null) {
+                                com.example.agristockcapstoneproject.utils.BlockingUtils.checkIfBlocked(currentUserId, sellerId) { isBlocked ->
+                                    if (isBlocked) {
+                                        Toast.makeText(this, "You cannot message this seller. They have been blocked.", Toast.LENGTH_LONG).show()
+                                        return@checkIfBlocked
+                                    }
+                                    
+                                    // User not blocked, proceed with creating or finding chat
+                                    createOrFindChat(sellerId)
+                                }
+                            } else {
+                                createOrFindChat(sellerId)
+                            }
+                        } else {
+                            Toast.makeText(this, "Post not found", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                    .addOnFailureListener {
+                        Toast.makeText(this, "Failed to load post details", Toast.LENGTH_SHORT).show()
+                    }
             }
             .addOnFailureListener {
-                Toast.makeText(this, "Failed to load post details", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Failed to check verification status", Toast.LENGTH_SHORT).show()
             }
     }
     
@@ -844,5 +893,42 @@ class ItemDetailsActivity : AppCompatActivity() {
             // Hide stars when no ratings
             ratingContainer.visibility = View.GONE
         }
+    }
+    
+    // ✅ VERIFICATION CHECK FUNCTION FOR MESSAGING
+    private fun showVerificationRequiredForMessaging(verificationStatus: String?) {
+        val message = when (verificationStatus) {
+            "pending" -> "Your verification request is being reviewed by our team. You'll be able to message sellers once your account is verified.\n\nThank you for your patience!"
+            "rejected" -> "Your previous verification was rejected. Please submit a new verification request with valid documents to message sellers."
+            else -> "You must verify your account before messaging sellers. This helps prevent spam and maintains trust in our community.\n\nWould you like to verify your account now?"
+        }
+        
+        val title = if (verificationStatus == "pending") "Verification Pending" else "Verification Required"
+        val positiveButtonText = when (verificationStatus) {
+            "pending" -> "OK"
+            "rejected" -> "Resubmit"
+            else -> "Verify Now"
+        }
+        
+        val builder = androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle(title)
+            .setMessage(message)
+            .setPositiveButton(positiveButtonText) { _, _ ->
+                if (verificationStatus == "pending") {
+                    // Just close dialog for pending status
+                } else {
+                    // Navigate to verification for others
+                    startActivity(Intent(this, VerificationActivity::class.java))
+                }
+            }
+        
+        // Only add negative button if not pending
+        if (verificationStatus != "pending") {
+            builder.setNegativeButton("Cancel", null)
+        } else {
+            builder.setCancelable(false)
+        }
+        
+        builder.show()
     }
 }

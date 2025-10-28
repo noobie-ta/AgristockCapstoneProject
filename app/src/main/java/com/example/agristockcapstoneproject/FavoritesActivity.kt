@@ -30,6 +30,7 @@ class FavoritesActivity : AppCompatActivity() {
     private lateinit var recyclerView: RecyclerView
     private lateinit var emptyState: LinearLayout
     private lateinit var browseButton: TextView
+    private lateinit var swipeRefresh: androidx.swiperefreshlayout.widget.SwipeRefreshLayout
     private val items = mutableListOf<FavoriteItem>()
     private val loadedPostIds = mutableSetOf<String>() // Track already loaded post IDs to prevent duplicates
 
@@ -49,6 +50,7 @@ class FavoritesActivity : AppCompatActivity() {
         recyclerView = findViewById(R.id.rv_favorites)
         emptyState = findViewById(R.id.ll_empty_state)
         browseButton = findViewById(R.id.btn_browse_items)
+        swipeRefresh = findViewById(R.id.swipe_refresh)
 
         recyclerView.layoutManager = LinearLayoutManager(this)
         recyclerView.itemAnimator = DefaultItemAnimator()
@@ -58,6 +60,16 @@ class FavoritesActivity : AppCompatActivity() {
 
         browseButton.setOnClickListener {
             finish()
+        }
+
+        // Setup swipe-to-refresh
+        swipeRefresh.setColorSchemeResources(
+            R.color.yellow_accent,
+            R.color.yellow_dark,
+            android.R.color.holo_orange_dark
+        )
+        swipeRefresh.setOnRefreshListener {
+            refreshFavorites()
         }
 
         loadFavorites()
@@ -80,6 +92,14 @@ class FavoritesActivity : AppCompatActivity() {
         removeFavoritesListener()
     }
 
+    private fun refreshFavorites() {
+        // The real-time listener already keeps data fresh,
+        // so we just need to stop the refresh animation after a short delay
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+            swipeRefresh.isRefreshing = false
+        }, 1000)
+    }
+
     private fun loadFavorites() {
         val uid = auth.currentUser?.uid ?: run {
             showEmpty()
@@ -87,7 +107,7 @@ class FavoritesActivity : AppCompatActivity() {
         }
         firestore.collection("users").document(uid)
             .collection("favorites")
-            .orderBy("createdAt")
+            .orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING)
             .get()
             .addOnSuccessListener { qs ->
                 items.clear()
@@ -167,11 +187,13 @@ class FavoritesActivity : AppCompatActivity() {
     private fun showEmpty() {
         emptyState.visibility = View.VISIBLE
         recyclerView.visibility = View.GONE
+        swipeRefresh.isRefreshing = false
     }
 
     private fun showList() {
         emptyState.visibility = View.GONE
         recyclerView.visibility = View.VISIBLE
+        swipeRefresh.isRefreshing = false
     }
 
     private fun confirmRemoval(item: FavoriteItem) {
@@ -194,15 +216,12 @@ class FavoritesActivity : AppCompatActivity() {
         }
         removingItems.add(item.id)
         
-        // Get the index before deletion for proper animation
-        val index = items.indexOfFirst { it.id == item.id }
-        
         // Delete from user's favorites
         firestore.collection("users").document(uid)
             .collection("favorites").document(item.id)
             .delete()
             .addOnSuccessListener {
-                // Update the post's favorite count with better error handling
+                // Update the post's favorite count
                 firestore.collection("posts").document(item.id)
                     .get()
                     .addOnSuccessListener { postDoc ->
@@ -213,54 +232,29 @@ class FavoritesActivity : AppCompatActivity() {
                             firestore.collection("posts").document(item.id)
                                 .update("favoriteCount", newCount)
                                 .addOnSuccessListener {
-                                    // Update UI after successful database operations
-                                    updateUIAfterRemoval(index)
+                                    android.util.Log.d("FavoritesActivity", "Favorite count updated for ${item.id}")
+                                    // UI will be updated automatically by the real-time listener
+                                    removingItems.remove(item.id)
                                 }
                                 .addOnFailureListener { exception ->
-                                    // Handle post update failure
-                                    android.widget.Toast.makeText(this, "Failed to update post count: ${exception.message}", android.widget.Toast.LENGTH_SHORT).show()
-                                    // Still remove from UI since favorite was deleted
-                                    updateUIAfterRemoval(index)
+                                    android.util.Log.e("FavoritesActivity", "Failed to update post count: ${exception.message}")
+                                    removingItems.remove(item.id)
                                 }
                         } else {
-                            // Post doesn't exist, just update UI
-                            updateUIAfterRemoval(index)
+                            // Post doesn't exist, just clear tracking
+                            removingItems.remove(item.id)
                         }
                     }
                     .addOnFailureListener { exception ->
-                        // Handle post fetch failure
-                        android.widget.Toast.makeText(this, "Failed to fetch post: ${exception.message}", android.widget.Toast.LENGTH_SHORT).show()
-                        // Still remove from UI since favorite was deleted
-                        updateUIAfterRemoval(index)
+                        android.util.Log.e("FavoritesActivity", "Failed to fetch post: ${exception.message}")
+                        removingItems.remove(item.id)
                     }
             }
             .addOnFailureListener { exception ->
                 // Handle favorite deletion failure
                 android.widget.Toast.makeText(this, "Failed to remove favorite: ${exception.message}", android.widget.Toast.LENGTH_SHORT).show()
-                // Clear the removing item from tracking
                 removingItems.remove(item.id)
             }
-    }
-    
-    private fun updateUIAfterRemoval(index: Int) {
-        try {
-            if (index != -1 && index < items.size) {
-                val removedItem = items.removeAt(index)
-                // Remove from tracking sets
-                removingItems.remove(removedItem.id)
-                loadedPostIds.remove(removedItem.id)
-                // Notify adapter of the change
-                recyclerView.adapter?.notifyItemRemoved(index)
-                // Also notify that the data set has changed to ensure consistency
-                recyclerView.adapter?.notifyDataSetChanged()
-            }
-            if (items.isEmpty()) showEmpty()
-        } catch (e: Exception) {
-            // Handle UI update errors
-            android.widget.Toast.makeText(this, "Error updating UI: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
-            // Force refresh the entire list
-            loadFavorites()
-        }
     }
 
     private inner class FavoritesAdapter(
@@ -327,36 +321,67 @@ class FavoritesActivity : AppCompatActivity() {
         
         favoritesListener = firestore.collection("users").document(uid)
             .collection("favorites")
-            .orderBy("createdAt")
+            .orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING)
             .addSnapshotListener { snapshot, exception ->
                 if (exception != null) {
-                    showEmpty()
+                    android.util.Log.e("FavoritesActivity", "Listener error: ${exception.message}")
                     return@addSnapshotListener
                 }
                 
-                items.clear()
-                loadedPostIds.clear()
+                if (snapshot == null) return@addSnapshotListener
                 
-                snapshot?.documents?.forEach { doc ->
+                // Get current document IDs from Firestore
+                val currentPostIds = snapshot.documents.mapNotNull { 
+                    it.getString("postId") ?: it.id 
+                }.toSet()
+                
+                // Find items to remove (in local list but not in Firestore)
+                val itemsToRemove = items.filter { !currentPostIds.contains(it.id) }
+                itemsToRemove.forEach { item ->
+                    val index = items.indexOf(item)
+                    if (index != -1) {
+                        items.removeAt(index)
+                        loadedPostIds.remove(item.id)
+                        recyclerView.adapter?.notifyItemRemoved(index)
+                        android.util.Log.d("FavoritesActivity", "Removed item: ${item.id}")
+                    }
+                }
+                
+                // Find items to add (in Firestore but not in local list)
+                snapshot.documents.forEach { doc ->
                     val postId = doc.getString("postId") ?: doc.id
                     
-                    // Skip if already added to prevent duplicates
                     if (!loadedPostIds.contains(postId)) {
                         loadedPostIds.add(postId)
                         
-                        items.add(
-                            FavoriteItem(
-                                id = postId,
-                                title = doc.getString("title") ?: "",
-                                price = doc.getString("price") ?: "",
-                                imageUrl = doc.getString("imageUrl"),
-                                date = doc.getString("date") ?: "",
-                                type = "SELL" // Default type for listener, will be updated if needed
-                            )
+                        val newItem = FavoriteItem(
+                            id = postId,
+                            title = doc.getString("title") ?: "",
+                            price = doc.getString("price") ?: "",
+                            imageUrl = doc.getString("imageUrl"),
+                            date = doc.getString("date") ?: "",
+                            type = "SELL" // Default type for listener
                         )
+                        
+                        items.add(newItem)
+                        recyclerView.adapter?.notifyItemInserted(items.size - 1)
+                        android.util.Log.d("FavoritesActivity", "Added item: ${postId}")
+                        
+                        // Fetch the actual post type asynchronously
+                        firestore.collection("posts").document(postId)
+                            .get()
+                            .addOnSuccessListener { postDoc ->
+                                val postType = postDoc.getString("type") ?: "SELL"
+                                val itemIndex = items.indexOfFirst { it.id == postId }
+                                if (itemIndex != -1 && items[itemIndex].type != postType) {
+                                    items[itemIndex] = items[itemIndex].copy(type = postType)
+                                    recyclerView.adapter?.notifyItemChanged(itemIndex)
+                                }
+                            }
                     }
                 }
-                recyclerView.adapter?.notifyDataSetChanged()
+                
+                // Update visibility
                 if (items.isEmpty()) showEmpty() else showList()
             }
     }
@@ -375,6 +400,7 @@ class FavoritesActivity : AppCompatActivity() {
         scaleY.start()
     }
 }
+
 
 
 

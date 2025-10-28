@@ -9,6 +9,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.provider.MediaStore
 import android.widget.ImageView
+import android.util.Log
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.AppCompatButton
@@ -16,6 +17,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 import com.google.firebase.storage.FirebaseStorage
 import java.io.ByteArrayOutputStream
 
@@ -141,8 +143,8 @@ class SelfieVerificationActivity : AppCompatActivity() {
             capturedSelfie.visibility = ImageView.VISIBLE
             
             // Show action buttons
-            retakeButton.visibility = AppCompatButton.VISIBLE
-            submitButton.visibility = AppCompatButton.VISIBLE
+            retakeButton.visibility = android.view.View.VISIBLE
+            submitButton.visibility = android.view.View.VISIBLE
             captureButton.visibility = ImageView.GONE
         }
     }
@@ -151,8 +153,8 @@ class SelfieVerificationActivity : AppCompatActivity() {
         capturedSelfie.visibility = ImageView.GONE
         
         // Hide action buttons
-        retakeButton.visibility = AppCompatButton.GONE
-        submitButton.visibility = AppCompatButton.GONE
+        retakeButton.visibility = android.view.View.GONE
+        submitButton.visibility = android.view.View.GONE
         captureButton.visibility = ImageView.VISIBLE
         
         capturedImageUri = null
@@ -204,11 +206,19 @@ class SelfieVerificationActivity : AppCompatActivity() {
         val storageRef = storage.reference.child(path)
         storageRef.putFile(uri)
             .addOnSuccessListener { taskSnapshot ->
-                taskSnapshot.storage.downloadUrl.addOnSuccessListener { downloadUrl ->
-                    onSuccess(downloadUrl.toString())
-                }
+                taskSnapshot.storage.downloadUrl
+                    .addOnSuccessListener { downloadUrl ->
+                        onSuccess(downloadUrl.toString())
+                    }
+                    .addOnFailureListener { exception ->
+                        Log.e("SelfieVerificationActivity", "Failed to get download URL", exception)
+                        Toast.makeText(this, "Failed to get image URL: ${exception.message}", Toast.LENGTH_SHORT).show()
+                        submitButton.isEnabled = true
+                        submitButton.text = "Submit"
+                    }
             }
             .addOnFailureListener { exception ->
+                Log.e("SelfieVerificationActivity", "Upload failed", exception)
                 Toast.makeText(this, "Upload failed: ${exception.message}", Toast.LENGTH_SHORT).show()
                 submitButton.isEnabled = true
                 submitButton.text = "Submit"
@@ -234,13 +244,19 @@ class SelfieVerificationActivity : AppCompatActivity() {
             .add(verificationData)
             .addOnSuccessListener { documentRef ->
                 // Update user's verification status
+                // Use set() with merge() to create document if it doesn't exist
+                val userUpdate = hashMapOf<String, Any>(
+                    "verificationStatus" to "pending"
+                )
                 firestore.collection("users").document(currentUser.uid)
-                    .update("verificationStatus", "pending")
+                    .set(userUpdate, SetOptions.merge())
                     .addOnSuccessListener {
                         showSuccessMessage()
                     }
                     .addOnFailureListener { exception ->
-                        Toast.makeText(this, "Failed to update verification status: ${exception.message}", Toast.LENGTH_SHORT).show()
+                        // Even if update fails, show success since verification request was saved
+                        Log.e("SelfieVerificationActivity", "Failed to update verification status", exception)
+                        showSuccessMessage()
                     }
             }
             .addOnFailureListener { exception ->

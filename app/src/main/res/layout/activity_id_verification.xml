@@ -82,7 +82,26 @@
                 android:textColor="#333333"
                 android:textSize="16sp"
                 android:gravity="center"
-                android:layout_marginBottom="32dp" />
+                android:layout_marginBottom="24dp" />
+
+            <!-- ID Type Selection -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Select ID Type"
+                android:textColor="#000000"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="8dp" />
+
+            <Spinner
+                android:id="@+id/spinner_id_type"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:background="@drawable/rounded_border_background"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:layout_marginBottom="24dp" />
 
             <!-- Front ID Upload -->
             <TextView

@@ -626,7 +626,7 @@ class ProfileActivity : AppCompatActivity() {
 		if (isListView) {
 			// List View - full width cards
 			posts.forEach { post ->
-				val itemView = inflater.inflate(R.layout.item_profile_post, postsContainer, false)
+			val itemView = inflater.inflate(R.layout.item_profile_post, postsContainer, false)
 				setupPostItem(itemView, post)
 				postsContainer.addView(itemView)
 			}
@@ -1014,6 +1014,17 @@ class ProfileActivity : AppCompatActivity() {
 
 	private fun saveProfileData(username: String, bio: String, location: String, contact: String) {
 		val user = auth.currentUser ?: return
+		
+		// Validate mobile number format
+		if (contact.isNotEmpty()) {
+			val cleanedContact = contact.replace(" ", "").replace("-", "").replace("(", "").replace(")", "")
+			// Check if it's a valid Philippine mobile number (11 digits starting with 09)
+			val mobilePattern = Regex("^09\\d{9}$")
+			if (!mobilePattern.matches(cleanedContact)) {
+				Toast.makeText(this, "Please enter a valid mobile number (09XXXXXXXXX)", Toast.LENGTH_LONG).show()
+				return
+			}
+		}
 		
 		val updates = mapOf(
 			"username" to username,
